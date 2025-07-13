@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block head %}
+    {% endblock %}
+    <title>Dobrotno App</title>
+</head>
+<body>
+    <nav class="flex justify-between text-3xl my-3">
+        <ul class="flex ml-10">
+            <li><a href=""> Dobrotno App</a></li>
+        </ul>
+
+        <ul class="flex gap-5 mr-10">
+            <li><a href="">My Acc</a></li>
+            <li><a href="">Logout</a></li>
+        </ul>
+    </nav>
+    <hr>
+    <div id="content">
+        {% block content %}
+        {% endblock %}
+    </div>
+</body>
+</html>
