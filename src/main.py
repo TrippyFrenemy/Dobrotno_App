@@ -4,7 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -17,6 +19,8 @@ from src.users.models import User, UserRole
 
 from src.auth.router import router as auth_router
 from src.users.router import router as users_router
+from src.orders.router import router as orders_router
+from src.returns.router import router as returns_router
 
 from src.database import async_session_maker
 from passlib.context import CryptContext
@@ -82,6 +86,12 @@ async def public_root(request: Request):
 async def dashboard(request: Request, user: User = Depends(get_current_user)):
     return templates.TemplateResponse("index.html", {"request": request, "user": user})
 
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request, exc):
+    if exc.status_code == 401:
+        return RedirectResponse("/")
+    return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
+
 app.include_router(
     router=auth_router,
     prefix="/auth",
@@ -92,4 +102,16 @@ app.include_router(
     router=users_router,
     prefix="/users",
     tags=["Users"],
+)
+
+app.include_router(
+    router=orders_router,
+    prefix="/orders",
+    tags=["Orders"],
+)
+
+app.include_router(
+    router=returns_router,
+    prefix="/returns",
+    tags=["Returns"],
 )

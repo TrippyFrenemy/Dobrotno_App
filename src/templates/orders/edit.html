@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Редактировать заказ{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
+  <h2 class="text-xl font-semibold mb-4">Редактировать заказ #{{ order.id }}</h2>
+  <form method="post" class="flex flex-col gap-4">
+    <input type="text" name="phone_number" value="{{ order.phone_number }}" required class="border p-2 rounded" />
+    <input type="date" name="date_" value="{{ order.date }}" required class="border p-2 rounded" />
+    <input type="number" step="0.01" name="amount" value="{{ order.amount }}" required class="border p-2 rounded" />
+    <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
+  </form>
+</div>
+
+<div id="toast" class="hidden fixed top-6 right-6 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50">
+  Введите корректный номер телефона
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const phoneInput = document.querySelector('input[name="phone_number"]');
+  const form = phoneInput.closest("form");
+
+  const im = new Inputmask("38099-999-99-99", {
+    placeholder: "_",
+    showMaskOnHover: false,
+  });
+  im.mask(phoneInput);
+
+  form.addEventListener("submit", (e) => {
+    const rawValue = phoneInput.inputmask.test(phoneInput.value);
+    const valid = /^380\d{2}-\d{3}-\d{2}-\d{2}$/.test(rawValue);
+
+    if (!valid) {
+        e.preventDefault();
+        const toast = document.getElementById("toast");
+        toast.classList.remove("hidden");
+        toast.classList.add("block");
+
+        setTimeout(() => {
+        toast.classList.add("hidden");
+        toast.classList.remove("block");
+        }, 3000);
+    }
+    });
+});
+</script>
+{% endblock %}

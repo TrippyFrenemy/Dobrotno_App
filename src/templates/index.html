@@ -5,4 +5,46 @@
 {% block content %}
 <h2 class="text-2xl font-semibold">Добро пожаловать, {{ user.name }}!</h2>
 <p class="mt-4 text-gray-700">Вы вошли как {{ user.role }}.</p>
+
+{% if user.role in ['admin', 'manager'] %}
+
+<!-- 📦 Заказы -->
+<div class="mb-6">
+  <h3 class="text-lg font-semibold text-gray-700 mb-2">📦 Заказы</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <a href="/orders/create" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center">➕ Добавить заказ</a>
+    <a href="/orders/{{ user.id }}/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📋 Список заказов {{ user.name }}</a>
+    {% if user.role == 'admin' %}
+    <a href="/orders/all/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📋 Список заказов всех пользователей</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ↩️ Возвраты -->
+<div class="mb-6">
+  <h3 class="text-lg font-semibold text-gray-700 mb-2">↩️ Возвраты</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <a href="/returns/create" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-center">➖ Добавить возврат</a>
+    <a href="/returns/{{ user.id }}/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📄 Список возвратов {{ user.name }}</a>
+    {% if user.role == 'admin' %}
+    <a href="/returns/all/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📄 Список возвратов всех пользователей</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 📊 Смены и касса -->
+<!-- <div class="mb-6">
+  <h3 class="text-lg font-semibold text-gray-700 mb-2">📊 Смены и касса</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <a href="/shifts/create" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-center">📅 Назначить смену</a>
+    <a href="/reports/daily" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📈 Отчёт по дням</a>
+    <a href="/reports/monthly" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📊 Отчёт по месяцам</a>
+  </div>
+</div> -->
+
+{% endif %}
+
+
+
+
 {% endblock %}

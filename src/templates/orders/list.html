@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Список заказов{% endblock %}
+
+{% block content %}
+
+{% if orders %}
+<h3 class="text-xl font-semibold mb-3">Результаты</h3>
+<table class="w-full text-sm border">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Дата</th>
+      <th class="p-2 border">Телефон</th>
+      <th class="p-2 border">Сумма</th>
+      <th class="p-2 border">Действия</th>
+      {% if user.role == 'admin' %}
+      <th class="p-2 border">Создатель</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for order in orders %}
+    <tr>
+      <td class="p-2 border">{{ order.date }}</td>
+      <td class="p-2 border">{{ order.phone_number }}</td>
+      <td class="p-2 border">{{ order.amount }}</td>
+      {% if user.role == 'admin' %}
+        <td class="p-2 border">{{ order.created_by_user.name if order.created_by_user else "-" }}</td>
+      {% endif %}
+      <td class="p-2 border">
+        <a href="/orders/{{ order.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
+        {% if user.role == 'admin' %}
+        <form method="post" action="/orders/{{ order.id }}/delete" onsubmit="return confirm('Удалить заказ?');">
+          <button class="text-red-600 hover:underline">Удалить</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
