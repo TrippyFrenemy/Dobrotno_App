@@ -2,26 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>{% block title %}Dobrotno App{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    {% block head %}
-    {% endblock %}
-    <title>Dobrotno App</title>
 </head>
-<body>
-    <nav class="flex justify-between text-3xl my-3">
-        <ul class="flex ml-10">
-            <li><a href=""> Dobrotno App</a></li>
-        </ul>
-
-        <ul class="flex gap-5 mr-10">
-            <li><a href="">My Acc</a></li>
-            <li><a href="">Logout</a></li>
-        </ul>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-white shadow py-4 px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-700">Dobrotno App</h1>
+        <div>
+            {% if user is defined and user %}
+                <span class="mr-4 text-gray-600">{{ user.name }}</span>
+                <a href="/auth/logout" class="text-red-500 hover:underline">Выход</a>
+            {% endif %}
+        </div>
     </nav>
-    <hr>
-    <div id="content">
-        {% block content %}
-        {% endblock %}
-    </div>
+    <main class="p-8">
+        {% block content %}{% endblock %}
+    </main>
 </body>
 </html>
+
+<script>
+    async function refreshTokenIfNeeded() {
+        const exp = localStorage.getItem('access_exp');
+        if (exp && Date.now() > parseInt(exp)) {
+            try {
+                const res = await fetch("/auth/refresh", { method: "POST", credentials: "include" });
+                if (res.ok) {
+                    const now = Date.now();
+                    localStorage.setItem('access_exp', now + 30 * 60 * 1000); // +30 минут
+                } else {
+                    window.location.href = "/auth/login";
+                }
+            } catch {
+                window.location.href = "/auth/login";
+            }
+        }
+    }
+
+    setInterval(refreshTokenIfNeeded, 60_000); // раз в минуту
+</script>
