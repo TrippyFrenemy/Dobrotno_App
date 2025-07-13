@@ -19,5 +19,6 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(SqlEnum(UserRole), nullable=False, default=UserRole.EMPLOYEE)
     default_rate = Column(Numeric(10, 2), default=0.0)
+    default_percent = Column(Numeric(10, 2), default=1.0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

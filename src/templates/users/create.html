@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Создать пользователя{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
+  <h2 class="text-xl font-semibold mb-4">Новый пользователь</h2>
+  <form method="post" class="flex flex-col gap-4">
+    <input type="text" name="email" placeholder="Email" required class="border p-2 rounded" />
+    <input type="text" name="name" placeholder="Имя" required class="border p-2 rounded" />
+    <input type="password" name="password" placeholder="Пароль" required class="border p-2 rounded" />
+    <select name="role" required class="border p-2 rounded">
+      <option value="employee">Сотрудник</option>
+      <option value="manager">Менеджер</option>
+      <option value="admin">Администратор (Не ставить не Аврущенко)</option>
+    </select>
+    <input type="number" name="default_rate" step="100" placeholder="Ставка (грн)" class="border p-2 rounded" />
+    <input type="number" name="default_percent" step="1" placeholder="Ставка (%)" class="border p-2 rounded" />
+    <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Создать</button>
+  </form>
+{% if error %}
+  <p class="text-red-600 font-semibold">{{ error }}</p>
+{% endif %}
+</div>
+{% endblock %}

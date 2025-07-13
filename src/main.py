@@ -14,7 +14,9 @@ import redis.asyncio as redis
 
 from src.auth.dependencies import get_current_user
 from src.users.models import User, UserRole
+
 from src.auth.router import router as auth_router
+from src.users.router import router as users_router
 
 from src.database import async_session_maker
 from passlib.context import CryptContext
@@ -86,3 +88,8 @@ app.include_router(
     tags=["Auth"],
 )
 
+app.include_router(
+    router=users_router,
+    prefix="/users",
+    tags=["Users"],
+)

@@ -9,7 +9,7 @@ class RoleEnum(str, Enum):
     employee = "employee"
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str
     name: str
     password: str
     role: RoleEnum
@@ -17,7 +17,7 @@ class UserCreate(BaseModel):
 
 class UserOut(BaseModel):
     id: int
-    email: EmailStr
+    email: str
     name: str
     role: RoleEnum
     default_rate: Decimal
@@ -25,4 +25,3 @@ class UserOut(BaseModel):
 
     class Config:
         orm_mode = True
-        
