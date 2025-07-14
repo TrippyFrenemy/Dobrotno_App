@@ -32,13 +32,6 @@ async def create_order(
     if abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
 
-    result = await session.execute(select(Shift).where(Shift.date == date_))
-    shift = result.scalar_one_or_none()
-
-    if shift:
-        if shift.created_by != user.id and user.role != "admin":
-            raise HTTPException(status_code=403, detail="Вы не можете добавлять заказы на эту дату — смену создал другой пользователь")
-
     stmt = insert(Order).values(
         phone_number=phone_number,
         date=date_,

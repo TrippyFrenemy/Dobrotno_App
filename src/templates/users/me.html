@@ -45,19 +45,21 @@
         </thead>
         <tbody>
           {% for u in users %}
-          <tr>
-            <td class="p-2 border">{{ u.name }}</td>
-            <td class="p-2 border">{{ u.email }}</td>
-            <td class="p-2 border">{{ u.role }}</td>
-            <td class="p-2 border">{{ u.default_rate }}</td>
-            <td class="p-2 border">{{ u.default_percent }}</td>
-            <td class="p-2 border">
-              <a href="/users/{{ u.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
-              <form method="post" action="/users/{{ u.id }}/delete" onsubmit="return confirm('Удалить пользователя {{ u.name }}?');" style="display:inline;">
-                <button type="submit" class="text-red-600 hover:underline ml-2">Удалить</button>
-              </form>
-            </td>
-          </tr>
+          {% if u.is_active %}
+            <tr>
+              <td class="p-2 border">{{ u.name }}</td>
+              <td class="p-2 border">{{ u.email }}</td>
+              <td class="p-2 border">{{ u.role }}</td>
+              <td class="p-2 border">{{ u.default_rate }}</td>
+              <td class="p-2 border">{{ u.default_percent }}</td>
+              <td class="p-2 border">
+                <a href="/users/{{ u.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
+                <form method="post" action="/users/{{ u.id }}/delete" onsubmit="return confirm('Удалить пользователя {{ u.name }}?');" style="display:inline;">
+                  <button type="submit" class="text-red-600 hover:underline ml-2">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% endif %}
           {% endfor %}
         </tbody>
       </table>

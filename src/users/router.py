@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -75,6 +76,7 @@ async def update_user(
     role: str = Form(...),
     default_rate: float = Form(0.0),
     default_percent: float = Form(1.0),
+    is_active: Optional[bool] = Form(False),
     session: AsyncSession = Depends(get_async_session),
     admin: User = Depends(get_admin_user),
 ):
@@ -86,6 +88,7 @@ async def update_user(
     user.role = role
     user.default_rate = default_rate
     user.default_percent = default_percent
+    user.is_active = is_active
     await session.commit()
     return RedirectResponse("/users/me", status_code=302)
 

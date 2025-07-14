@@ -65,7 +65,7 @@ async def calc_daily_salary(session: AsyncSession, target_date: date, orders_amo
             # elif len(employees) == 2:
             for e in employees:
                 fixed[e.user_id] += e.user.default_rate
-                percent[e.user_id] += round(cashbox * e.user.default_percent / 100, 2)
+                percent[e.user_id] += round(cashbox * e.user.default_percent / 100)
 
         # 💼 Сотрудники обычных локаций — ставка
         else:
@@ -73,15 +73,21 @@ async def calc_daily_salary(session: AsyncSession, target_date: date, orders_amo
                 fixed[a.user_id] += round(a.user.default_rate, 2)
 
         # 👤 Создатель смены — админ или менеджер
-        creator_result = await session.execute(select(User).where(User.id == shift.created_by))
-        creator = creator_result.scalar_one_or_none()
+    orders_q = await session.execute(
+        select(Order.created_by, func.sum(Order.amount))
+        .where(Order.date == target_date)
+        .group_by(Order.created_by)
+    )
+    order_creators = orders_q.all()
 
-        if creator and creator.role in [UserRole.ADMIN, UserRole.MANAGER]:
-            if shift.location == ShiftLocation.tiktok:
-                fixed[creator.id] += creator.default_rate
-                percent[creator.id] += round(cashbox * creator.default_percent / 100, 2)
-            else:
-                fixed[creator.id] += round(creator.default_rate, 2)
+    for user_id, total_amount in order_creators:
+        user_q = await session.execute(select(User).where(User.id == user_id))
+        user = user_q.scalar_one_or_none()
+        if not user:
+            continue
+        if user.role in [UserRole.ADMIN, UserRole.MANAGER]:
+            fixed[user.id] += user.default_rate
+            percent[user.id] += round((total_amount - returns_amount) * user.default_percent / 100)
 
     return {
         "fixed": dict(fixed),
@@ -89,55 +95,98 @@ async def calc_daily_salary(session: AsyncSession, target_date: date, orders_amo
     }
 
 async def get_monthly_report(session: AsyncSession, start: date, end: date):
+    users_q = await session.execute(select(User))
+    users = {u.id: u for u in users_q.scalars().all()}
+
+    # Суммы заказов по дате и пользователю
+    orders_q = await session.execute(
+        select(Order.date, Order.created_by, func.sum(Order.amount))
+        .where(Order.date >= start, Order.date <= end)
+        .group_by(Order.date, Order.created_by)
+    )
+    orders_map = defaultdict(lambda: defaultdict(Decimal))
+    for dt, uid, amount in orders_q.all():
+        orders_map[dt][uid] += amount
+
+    # Суммы возвратов по дате
+    returns_q = await session.execute(
+        select(Return.date, func.sum(Return.amount))
+        .where(Return.date >= start, Return.date <= end)
+        .group_by(Return.date)
+    )
+    returns_map = {dt: amount for dt, amount in returns_q.all()}
+
+    # Все смены с назначениями
+    shifts_q = await session.execute(
+        select(Shift)
+        .where(Shift.date >= start, Shift.date <= end)
+        .options(selectinload(Shift.assignments).selectinload(ShiftAssignment.user))
+    )
+    shifts_by_date = defaultdict(list)
+    for shift in shifts_q.scalars().all():
+        shifts_by_date[shift.date].append(shift)
+
+    # Единый проход по дням
     result = []
+    fixed_total = defaultdict(Decimal)
+    percent_total = defaultdict(Decimal)
     current = start
 
-    fixed_by_user = defaultdict(Decimal)
-    percent_by_user = defaultdict(Decimal)
-
     while current <= end:
-        orders, returns = await get_cash_and_returns(session, current)
-        salary = await calc_daily_salary(session, current, orders, returns)
+        shifts = shifts_by_date.get(current, [])
+        day_orders = orders_map.get(current, {})
+        returns = returns_map.get(current, Decimal("0.00"))
+        total_orders = sum(day_orders.values())
+        cashbox = total_orders - returns
 
-        salary_by_user = defaultdict(Decimal)
-        for uid in set(salary["fixed"]) | set(salary["percent"]):
-            f = salary["fixed"].get(uid, 0)
-            p = salary["percent"].get(uid, 0)
-            salary_by_user[uid] = f + p
-            fixed_by_user[uid] += f
-            percent_by_user[uid] += p
+        fixed = defaultdict(Decimal)
+        percent = defaultdict(Decimal)
+        employees = set()
 
-        # 👥 Сотрудники и 👤 создатели смен
-        employees_for_day = set()
-        creators_for_day = set()
-
-        shifts_q = await session.execute(
-            select(Shift)
-            .where(Shift.date == current)
-            .options(selectinload(Shift.assignments).selectinload(ShiftAssignment.user))
-        )
-        shifts = shifts_q.scalars().all()
-
+        # Сотрудники по сменам
         for shift in shifts:
-            creators_for_day.add(shift.created_by)
-            for assignment in shift.assignments:
-                employees_for_day.add(assignment.user_id)
+            assignments = [a for a in shift.assignments if a.user.role == UserRole.EMPLOYEE]
+            employees.update(a.user_id for a in assignments)
+
+            if shift.location == ShiftLocation.tiktok:
+                for a in assignments:
+                    fixed[a.user_id] += a.user.default_rate
+                    percent[a.user_id] += round(cashbox * a.user.default_percent / 100)
+            else:
+                for a in assignments:
+                    fixed[a.user_id] += round(a.user.default_rate)
+
+        # Менеджеры/админы по заказам
+        for uid, amount in day_orders.items():
+            user = users.get(uid)
+            if user and user.role in [UserRole.ADMIN, UserRole.MANAGER]:
+                fixed[uid] += user.default_rate
+                percent[uid] += round((amount - returns) * user.default_percent / 100)
+
+        # Финальные суммы
+        salary_by_user = {
+            uid: fixed[uid] + percent[uid] for uid in set(fixed) | set(percent)
+        }
+        for uid in salary_by_user:
+            fixed_total[uid] += fixed[uid]
+            percent_total[uid] += percent[uid]
 
         result.append({
             "date": current,
-            "orders": orders,
+            "orders": total_orders,
             "returns": returns,
-            "cashbox": orders - returns,
-            "salary_by_user": dict(salary_by_user),
-            "salary_fixed_by_user": salary["fixed"],
-            "salary_percent_by_user": salary["percent"],
-            "employees": list(employees_for_day),
-            "creators": list(creators_for_day),
+            "cashbox": cashbox,
+            "salary_by_user": salary_by_user,
+            "salary_fixed_by_user": dict(fixed),
+            "salary_percent_by_user": dict(percent),
+            "employees": list(employees),
+            "creators": list(day_orders.keys()),
         })
 
         current += timedelta(days=1)
 
     return result
+
 
 async def get_payouts_for_period(session: AsyncSession, start: date, end: date):
     q = await session.execute(
