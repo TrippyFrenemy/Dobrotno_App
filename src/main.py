@@ -14,13 +14,15 @@ from sqlalchemy.exc import IntegrityError
 
 import redis.asyncio as redis
 
-from src.auth.dependencies import get_current_user
+from src.auth.dependencies import get_admin_user, get_current_user
 from src.users.models import User, UserRole
 
 from src.auth.router import router as auth_router
 from src.users.router import router as users_router
 from src.orders.router import router as orders_router
 from src.returns.router import router as returns_router
+from src.shifts.router import router as shifts_router
+from src.reports.router import router as reports_router
 
 from src.database import async_session_maker
 from passlib.context import CryptContext
@@ -114,4 +116,17 @@ app.include_router(
     router=returns_router,
     prefix="/returns",
     tags=["Returns"],
+)
+
+app.include_router(
+    router=shifts_router,
+    prefix="/shifts",
+    tags=["Shifts"],
+)
+
+app.include_router(
+    router=reports_router, 
+    prefix="/reports", 
+    tags=["Reports"],
+    dependencies=[Depends(get_admin_user)]
 )

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Редактировать смену{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
+  <h2 class="text-xl font-semibold mb-4">Редактировать смену</h2>
+  <form method="post" class="flex flex-col gap-4">
+    <label>Дата</label>
+    <input type="date" name="date_" value="{{ shift.date }}" required class="border p-2 rounded">
+
+    <label>Локация</label>
+    <select name="location" class="border p-2 rounded">
+      {% for loc in locations %}
+      <option value="{{ loc.value }}" {% if loc.value == shift.location.value %}selected{% endif %}>{{ loc.value }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Сотрудники</label>
+    <select name="employees" multiple required class="border p-2 rounded h-40">
+      {% for u in users %}
+      <option value="{{ u.id }}" {% if u.id in assigned_ids %}selected{% endif %}>{{ u.name }}</option>
+      {% endfor %}
+    </select>
+
+    <button class="bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Сохранить</button>
+  </form>
+</div>
+{% endblock %}

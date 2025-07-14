@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Список смен{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">📅 Список смен</h2>
+
+{% if shifts %}
+<table class="w-full text-sm border">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Дата</th>
+      <th class="p-2 border">Локация</th>
+      <th class="p-2 border">Сотрудники</th>
+      <th class="p-2 border">Создал</th>
+      <th class="p-2 border">Действия</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for shift in shifts %}
+    <tr>
+      <td class="p-2 border">{{ shift.date }}</td>
+      <td class="p-2 border">{{ shift.location.value }}</td>
+      <td class="p-2 border">
+        <ul class="list-disc list-inside">
+        {% for a in shift.assignments %}
+          <li>{{ a.user.name }}</li>
+        {% endfor %}
+        </ul>
+      </td>
+      <td class="p-2 border">{{ shift.created_by_user.name }}</td>
+      <td class="p-2 border">
+        <a href="/shifts/{{ shift.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
+        {% if user.role == 'admin' %}
+        <form method="post" action="/shifts/{{ shift.id }}/delete" style="display:inline;" onsubmit="return confirm('Удалить смену?');">
+            <button class="text-red-600 hover:underline ml-2">Удалить</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="italic text-gray-600">Смен пока нет.</p>
+{% endif %}
+{% endblock %}

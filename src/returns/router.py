@@ -27,6 +27,9 @@ async def create_return(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin)
 ):
+    if abs((date.today() - date_).days) > 14:
+        raise HTTPException(status_code=400, detail="Дата возврата должна быть в пределах 14 дней от сегодняшней")
+
     stmt = insert(Return).values(
         date=date_,
         amount=amount,
@@ -76,6 +79,9 @@ async def update_return(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
+    if abs((date.today() - date_).days) > 14:
+        raise HTTPException(status_code=400, detail="Дата возврата должна быть в пределах 14 дней от сегодняшней")
+
     ret = await session.get(Return, return_id)
     if not ret:
         raise HTTPException(status_code=404, detail="Возврат не найден")
@@ -93,4 +99,6 @@ async def update_return(
 async def delete_return(return_id: int, session: AsyncSession = Depends(get_async_session), user: User = Depends(get_admin_user)):
     await session.execute(delete(Return).where(Return.id == return_id))
     await session.commit()
-    return RedirectResponse("/returns/all/list", status_code=302)
+    if user.role == "admin":
+        return RedirectResponse("/returns/all/list", status_code=302)
+    return RedirectResponse(f"/returns/{user.id}/list", status_code=302)

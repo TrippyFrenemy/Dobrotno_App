@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from datetime import date
 from decimal import Decimal
 
+from src.shifts.models import Shift
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.orders.models import Order
@@ -28,6 +29,15 @@ async def create_order(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin)
 ):
+    if abs((date.today() - date_).days) > 14:
+        raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
+
+    result = await session.execute(select(Shift).where(Shift.date == date_))
+    shift = result.scalar_one_or_none()
+
+    if shift.created_by != user.id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Вы не можете добавлять заказы на эту дату — смену создал другой пользователь")
+
     stmt = insert(Order).values(
         phone_number=phone_number,
         date=date_,
@@ -36,6 +46,12 @@ async def create_order(
     )
     await session.execute(stmt)
     await session.commit()
+
+    result = await session.execute(select(Shift).where(Shift.date == date_))
+    shift = result.scalar_one_or_none()
+    if not shift:
+        return RedirectResponse(f"/shifts/create?date={date_.isoformat()}", status_code=302)
+
     return RedirectResponse("/dashboard", status_code=302)
 
 @router.get("/all/list", response_class=HTMLResponse)
@@ -98,6 +114,9 @@ async def update_order(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
+    if abs((date.today() - date_).days) > 14:
+        raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
+
     order = await session.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -120,4 +139,7 @@ async def delete_order(order_id: int,
 ):
     await session.execute(delete(Order).where(Order.id == order_id))
     await session.commit()
-    return RedirectResponse("/orders/list", status_code=302)
+    if user.role == "admin":
+        return RedirectResponse("/orders/all/list", status_code=302)
+    return RedirectResponse(f"/orders/{user.id}/list", status_code=302)
+
