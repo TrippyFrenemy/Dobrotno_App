@@ -89,11 +89,10 @@ async def make_payout(
     session.add(payout)
     await session.commit()
 
-    result = await session.execute(select(Shift).where(Shift.date == date))
-    shift = result.scalar_one_or_none()
-    if not shift:
-        return RedirectResponse(f"/shifts/create?date={date.isoformat()}", status_code=302)
-
-
+    # result = await session.execute(select(Shift).where(Shift.date == date))
+    # shift = result.scalar_one_or_none()
+    # if not shift:
+    #     return RedirectResponse(f"/shifts/create?date={date.isoformat()}", status_code=302)
+    
     return RedirectResponse(f"/reports/monthly?month={date.month}&year={date.year}", status_code=302)
 

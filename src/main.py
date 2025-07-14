@@ -23,35 +23,7 @@ from src.orders.router import router as orders_router
 from src.returns.router import router as returns_router
 from src.shifts.router import router as shifts_router
 from src.reports.router import router as reports_router
-
-from src.database import async_session_maker
-from passlib.context import CryptContext
-from sqlalchemy import select
-
-async def create_admin_user():
-    from src.config import ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME, ADMIN_ROLE
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-    async with async_session_maker() as session:
-        result = await session.execute(select(User).where(User.email == ADMIN_EMAIL))
-        existing = result.scalar_one_or_none()
-
-        if existing:
-            print("✅ Администратор уже существует, пропускаем создание")
-            return
-
-        try:
-            user = User(
-                email=ADMIN_EMAIL,
-                name=ADMIN_NAME,
-                role=UserRole(ADMIN_ROLE.lower()),
-                hashed_password=pwd_context.hash(ADMIN_PASSWORD),
-            )
-            session.add(user)
-            await session.commit()
-            print("✅ Администратор создан")
-        except IntegrityError:
-            print("⚠️ Администратор уже есть (integrity check)")
+from src.utils.create_admin import create_admin_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

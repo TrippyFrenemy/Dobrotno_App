@@ -35,8 +35,9 @@ async def create_order(
     result = await session.execute(select(Shift).where(Shift.date == date_))
     shift = result.scalar_one_or_none()
 
-    if shift.created_by != user.id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="Вы не можете добавлять заказы на эту дату — смену создал другой пользователь")
+    if shift:
+        if shift.created_by != user.id and user.role != "admin":
+            raise HTTPException(status_code=403, detail="Вы не можете добавлять заказы на эту дату — смену создал другой пользователь")
 
     stmt = insert(Order).values(
         phone_number=phone_number,

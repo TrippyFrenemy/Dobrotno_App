@@ -28,6 +28,8 @@
       <th class="p-2 border">Касса</th>
       <th class="p-2 border">Возвраты</th>
       <th class="p-2 border">Итог</th>
+      <th class="p-2 border">Сотрудники</th>
+      <th class="p-2 border">Менеджер</th>    
     </tr>
   </thead>
   <tbody>
@@ -41,6 +43,16 @@
       <td class="p-2 border">{{ "%.2f"|format(day.cashbox) }}</td>
       {% set total_cash = total_cash + day.orders %}
       {% set total_returns = total_returns + day.returns %}
+      <td class="p-2 border">
+        {% for uid in day.employees %}
+          {{ user_map.get(uid, "—") }}<br>
+        {% endfor %}
+      </td>
+      <td class="p-2 border">
+        {% for uid in day.creators %}
+          {{ user_map.get(uid, "—") }}<br>
+        {% endfor %}
+      </td>
     </tr>
     {% endfor %}
   </tbody>

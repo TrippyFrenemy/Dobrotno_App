@@ -22,6 +22,6 @@ class Payout(Base):
     amount = Column(Numeric(10, 2), nullable=False)
     paid_at = Column(DateTime, default=datetime.now)
     is_manual = Column(Boolean, default=False)
-    created_at = Column(DateTime, nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime, server_default=text("now()"), default=datetime.now)
 
     user = relationship("User", backref="payouts")

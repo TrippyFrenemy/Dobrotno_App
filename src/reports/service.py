@@ -58,14 +58,14 @@ async def calc_daily_salary(session: AsyncSession, target_date: date, orders_amo
 
         # 💰 Сотрудники TikTok — % от кассы
         if shift.location == ShiftLocation.tiktok:
-            if len(employees) == 1:
-                employee = employees[0]
-                fixed[employee.user_id] += employee.user.default_rate
-                percent[employee.user_id] += round(cashbox * employee.user.default_percent * 2 / 100, 2)
-            elif len(employees) == 2:
-                for e in employees:
-                    fixed[e.user_id] += e.user.default_rate
-                    percent[e.user_id] += round(cashbox * e.user.default_percent / 100, 2)
+            # if len(employees) == 1:
+            #     employee = employees[0]
+            #     fixed[employee.user_id] += employee.user.default_rate
+            #     percent[employee.user_id] += round(cashbox * employee.user.default_percent * 2 / 100, 2)
+            # elif len(employees) == 2:
+            for e in employees:
+                fixed[e.user_id] += e.user.default_rate
+                percent[e.user_id] += round(cashbox * e.user.default_percent / 100, 2)
 
         # 💼 Сотрудники обычных локаций — ставка
         else:
@@ -92,7 +92,6 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
     result = []
     current = start
 
-    # Глобальные словари по пользователям
     fixed_by_user = defaultdict(Decimal)
     percent_by_user = defaultdict(Decimal)
 
@@ -100,7 +99,6 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
         orders, returns = await get_cash_and_returns(session, current)
         salary = await calc_daily_salary(session, current, orders, returns)
 
-        # Сумма всех зарплат за день (для html)
         salary_by_user = defaultdict(Decimal)
         for uid in set(salary["fixed"]) | set(salary["percent"]):
             f = salary["fixed"].get(uid, 0)
@@ -108,6 +106,22 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
             salary_by_user[uid] = f + p
             fixed_by_user[uid] += f
             percent_by_user[uid] += p
+
+        # 👥 Сотрудники и 👤 создатели смен
+        employees_for_day = set()
+        creators_for_day = set()
+
+        shifts_q = await session.execute(
+            select(Shift)
+            .where(Shift.date == current)
+            .options(selectinload(Shift.assignments).selectinload(ShiftAssignment.user))
+        )
+        shifts = shifts_q.scalars().all()
+
+        for shift in shifts:
+            creators_for_day.add(shift.created_by)
+            for assignment in shift.assignments:
+                employees_for_day.add(assignment.user_id)
 
         result.append({
             "date": current,
@@ -117,6 +131,8 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
             "salary_by_user": dict(salary_by_user),
             "salary_fixed_by_user": salary["fixed"],
             "salary_percent_by_user": salary["percent"],
+            "employees": list(employees_for_day),
+            "creators": list(creators_for_day),
         })
 
         current += timedelta(days=1)

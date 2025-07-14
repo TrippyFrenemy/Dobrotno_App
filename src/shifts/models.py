@@ -18,7 +18,7 @@ class Shift(Base):
     date = Column(Date, unique=True, nullable=False)
     location = Column(Enum(ShiftLocation), nullable=False)
     created_by = Column(ForeignKey("users.id"))
-    created_at = Column(Date, nullable=False, server_default=text("now()"))
+    created_at = Column(Date, default=datetime.now, server_default=text("now()"))
 
     created_by_user = relationship("User", backref="created_shifts")
 
@@ -30,7 +30,7 @@ class ShiftAssignment(Base):
     shift_id = Column(ForeignKey("shifts.id"), nullable=False)
     user_id = Column(ForeignKey("users.id"), nullable=False)
     created_by = Column(ForeignKey("users.id"), nullable=False)
-    created_at = Column(Date, nullable=False, server_default=text("now()"))
+    created_at = Column(Date, default=datetime.now, server_default=text("now()"))
 
     shift = relationship("Shift", backref="assignments")
     user = relationship("User", foreign_keys=[user_id])
