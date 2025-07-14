@@ -30,8 +30,8 @@ from src.logs.middleware import LogUserActionMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    os.makedirs("/tmp", exist_ok=True)
-    os.makedirs("/src/static", exist_ok=True)
+    os.makedirs("tmp", exist_ok=True)
+    os.makedirs("src/static", exist_ok=True)
     await create_admin_user()
     yield
     # Cleanup actions can be added here if needed
