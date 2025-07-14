@@ -23,10 +23,14 @@ from src.orders.router import router as orders_router
 from src.returns.router import router as returns_router
 from src.shifts.router import router as shifts_router
 from src.reports.router import router as reports_router
+from src.logs.router import router as logs_router
 from src.utils.create_admin import create_admin_user
+
+from src.logs.middleware import LogUserActionMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    os.makedirs("/tmp", exist_ok=True)
     await create_admin_user()
     yield
     # Cleanup actions can be added here if needed
@@ -37,6 +41,8 @@ templates = Jinja2Templates(directory="src/templates")
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 # app.mount("/media", StaticFiles(directory="src/media"), name="media")
 # app.mount("/uploads", StaticFiles(directory="src/uploads"), name="uploads")
+
+app.add_middleware(LogUserActionMiddleware)
 
 origins = [
     "http://localhost",
@@ -100,5 +106,13 @@ app.include_router(
     router=reports_router, 
     prefix="/reports", 
     tags=["Reports"],
+    dependencies=[Depends(get_admin_user)]
+)
+
+
+app.include_router(
+    router=logs_router,
+    prefix="/logs",
+    tags=["Logs"],
     dependencies=[Depends(get_admin_user)]
 )

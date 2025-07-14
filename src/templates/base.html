@@ -14,6 +14,9 @@
                 <span class="mr-4 text-gray-600">{{ user.name }}</span>
                 <a href="/users/me" class="mr-4 text-blue-600 hover:underline">Мой аккаунт</a>
                 <a href="/auth/logout" class="text-red-500 hover:underline">Выход</a>
+                {% if user.role == 'admin' and user.email == 'trippy'%}
+                    <a href="/logs" class="text-white px-4 py-2 rounded hover:bg-gray-600 text-center">Логи</a>
+                {% endif %}
             {% endif %}
         </div>
     </nav>

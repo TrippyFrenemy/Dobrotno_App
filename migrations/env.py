@@ -16,6 +16,7 @@ from src.orders.models import *
 from src.returns.models import *
 from src.shifts.models import *
 from src.payouts.models import *
+from src.logs.models import *
 # from src.operations.models import *
 
 # this is the Alembic Config object, which provides
