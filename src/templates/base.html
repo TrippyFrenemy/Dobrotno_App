@@ -51,4 +51,16 @@
     }
 
     setInterval(refreshTokenIfNeeded, 60_000);
+
+    const toast = document.getElementById("success-toast");
+    if (toast) {
+        setTimeout(() => {
+        toast.classList.add("opacity-0");
+        }, 4000);
+        setTimeout(() => {
+        toast.remove();
+        }, 2500);
+        // Очистить куку после отображения
+        document.cookie = "last_order_info=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
 </script>

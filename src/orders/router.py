@@ -46,7 +46,9 @@ async def create_order(
     if not shift:
         return RedirectResponse(f"/shifts/create?date={date_.isoformat()}", status_code=302)
 
-    return RedirectResponse("/dashboard", status_code=302)
+    response = RedirectResponse("/dashboard?success=1", status_code=302)
+    response.set_cookie("last_order_info", f"{phone_number},{date_.isoformat()},{amount}", max_age=10)
+    return response
 
 @router.get("/all/list", response_class=HTMLResponse)
 async def list_orders(
