@@ -178,3 +178,24 @@ async def delete_shift(
     await session.commit()
 
     return RedirectResponse("/shifts/list", status_code=302)
+
+@router.get("/employees")
+async def get_shift_employees(
+    date: date = Query(...),
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(get_manager_or_admin),
+):
+    stmt = (
+        select(Shift)
+        .where(Shift.date == date)
+        .options(joinedload(Shift.assignments).joinedload(ShiftAssignment.user))
+    )
+    result = await session.execute(stmt)
+    shift = result.unique().scalar_one_or_none()
+
+    if not shift:
+        return {"employees": []}
+
+    return {
+        "employees": [a.user.name for a in shift.assignments]
+    }
