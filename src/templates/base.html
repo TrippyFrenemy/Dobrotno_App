@@ -2,27 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Dobrotno App{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     {% block head %}{% endblock %}
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <nav class="bg-white shadow py-4 px-8 flex justify-between items-center">
-        <a href="/dashboard" class="text-2xl font-bold text-gray-700 hover:underline">Dobrotno App</a>
-        <div>
+
+    <!-- Навигация -->
+    <nav class="bg-white shadow py-4 px-4 sm:px-6 lg:px-8 flex flex-wrap justify-between items-center">
+        <a href="/dashboard" class="text-xl font-bold text-gray-700 hover:underline">Dobrotno App</a>
+        <div class="mt-2 sm:mt-0 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
             {% if user is defined and user %}
-                <span class="mr-4 text-gray-600">{{ user.name }}</span>
-                <a href="/users/me" class="mr-4 text-blue-600 hover:underline">Мой аккаунт</a>
+                <span class="text-gray-600">{{ user.name | e }}</span>
+                <a href="/users/me" class="text-blue-600 hover:underline">Мой аккаунт</a>
                 <a href="/auth/logout" class="text-red-500 hover:underline">Выход</a>
-                {% if user.role == 'admin' and user.email == 'trippy'%}
-                    <a href="/logs" class="text-white px-4 py-2 rounded hover:bg-gray-600 text-center">Логи</a>
+                {% if user.role == 'admin' and user.email == 'trippy' %}
+                    <a href="/logs" class="bg-gray-800 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm">Логи</a>
                 {% endif %}
             {% endif %}
         </div>
     </nav>
-    <main class="p-8">
+
+    <!-- Контент -->
+    <main class="p-4 sm:p-6 lg:p-8 max-w-full overflow-x-auto">
         {% block content %}{% endblock %}
     </main>
+
 </body>
 </html>
 
@@ -44,5 +50,5 @@
         }
     }
 
-    setInterval(refreshTokenIfNeeded, 60_000); // раз в минуту
+
 </script>

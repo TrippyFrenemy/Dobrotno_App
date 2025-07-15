@@ -127,7 +127,8 @@ async def update_order(
 
 
 @router.post("/{order_id}/delete", response_class=RedirectResponse)
-async def delete_order(order_id: int,
+async def delete_order(
+    order_id: int,
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_admin_user),
 ):

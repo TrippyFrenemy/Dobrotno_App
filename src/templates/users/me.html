@@ -7,11 +7,11 @@
 
   <div class="bg-white p-6 rounded shadow">
     <h2 class="text-2xl font-semibold mb-4">Мой аккаунт</h2>
-    <p><strong>Имя:</strong> {{ user.name }}</p>
-    <p><strong>Email:</strong> {{ user.email }}</p>
-    <p><strong>Роль:</strong> {{ user.role }}</p>
-    <p><strong>Ставка по умолчанию:</strong> {{ user.default_rate }} ₽</p>
-    <p><strong>Процент от кассы:</strong> {{ user.default_percent or "0.0" }}%</p>
+    <p><strong>Имя:</strong> {{ user.name | e }}</p>
+    <p><strong>Email:</strong> {{ user.email | e }}</p>
+    <p><strong>Роль:</strong> {{ user.role | e }}</p>
+    <p><strong>Ставка по умолчанию:</strong> {{ user.default_rate | e }} грн</p>
+    <p><strong>Процент от кассы:</strong> {{ user.default_percent or "0.0" | e }}%</p>
 
     {% if user.role == 'admin' %}
     <div class="mt-6">
@@ -47,11 +47,11 @@
           {% for u in users %}
           {% if u.is_active %}
             <tr>
-              <td class="p-2 border">{{ u.name }}</td>
-              <td class="p-2 border">{{ u.email }}</td>
-              <td class="p-2 border">{{ u.role }}</td>
-              <td class="p-2 border">{{ u.default_rate }}</td>
-              <td class="p-2 border">{{ u.default_percent }}</td>
+              <td class="p-2 border">{{ u.name | e }}</td>
+              <td class="p-2 border">{{ u.email | e }}</td>
+              <td class="p-2 border">{{ u.role | e }}</td>
+              <td class="p-2 border">{{ u.default_rate | e }}</td>
+              <td class="p-2 border">{{ u.default_percent | e }}</td>
               <td class="p-2 border">
                 <a href="/users/{{ u.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
                 <form method="post" action="/users/{{ u.id }}/delete" onsubmit="return confirm('Удалить пользователя {{ u.name }}?');" style="display:inline;">

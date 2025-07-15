@@ -20,11 +20,11 @@
   <tbody>
     {% for order in orders %}
     <tr>
-      <td class="p-2 border">{{ order.date }}</td>
-      <td class="p-2 border">{{ order.phone_number }}</td>
-      <td class="p-2 border">{{ order.amount }}</td>
+      <td class="p-2 border">{{ order.date | e }}</td>
+      <td class="p-2 border">{{ order.phone_number | e }}</td>
+      <td class="p-2 border">{{ order.amount | e }}</td>
       {% if user.role == 'admin' %}
-        <td class="p-2 border">{{ order.created_by_user.name if order.created_by_user else "-" }}</td>
+        <td class="p-2 border">{{ order.created_by_user.name | e if order.created_by_user else "-" }}</td>
       {% endif %}
       <td class="p-2 border">
         <a href="/orders/{{ order.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
@@ -37,7 +37,7 @@
     </tr>
     {% endfor %}
   </tbody>
-</table>іі
+</table>
 {% else %}
 <p class="italic text-gray-600">Нет заказов.</p>
 {% endif %}

@@ -11,7 +11,7 @@
     <label>Локация</label>
     <select name="location" required class="border p-2 rounded">
       {% for loc in locations %}
-      <option value="{{ loc.value }}">{{ loc.value }}</option>
+      <option value="{{ loc.value }}">{{ loc.value | e }}</option>
       {% endfor %}
     </select>
 
@@ -19,7 +19,7 @@
     <select name="employees" multiple required class="border p-2 rounded h-40">
       {% for u in users %}
       {% if u.is_active %}
-      <option value="{{ u.id }}">{{ u.name }}</option>
+      <option value="{{ u.id }}">{{ u.name | e }}</option>
       {% endif %}
       {% endfor %}
     </select>

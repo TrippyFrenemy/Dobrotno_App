@@ -20,11 +20,11 @@
   <tbody>
     {% for ret in returns %}
     <tr>
-      <td class="p-2 border">{{ ret.date }}</td>
-      <td class="p-2 border">{{ ret.amount }}</td>
-      <td class="p-2 border">{{ ret.reason or "-" }}</td>
+      <td class="p-2 border">{{ ret.date | e }}</td>
+      <td class="p-2 border">{{ ret.amount | e }}</td>
+      <td class="p-2 border">{{ ret.reason or "-" | e  }}</td>
       {% if user.role == 'admin' %}
-      <td class="p-2 border">{{ ret.created_by_user.name if ret.created_by_user else "-" }}</td>
+      <td class="p-2 border">{{ ret.created_by_user.name if ret.created_by_user else "-" | e }}</td>
       {% endif %}
       <td class="p-2 border">
         <a href="/returns/{{ ret.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>

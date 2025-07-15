@@ -2,7 +2,7 @@
 {% block title %}Месячный отчёт{% endblock %}
 
 {% block content %}
-<h2 class="text-2xl font-semibold mb-4">📊 Месячный отчёт за {{ month }}/{{ year }}</h2>
+<h2 class="text-2xl font-semibold mb-4">📊 Месячный отчёт за {{ month | e }}/{{ year | e }}</h2>
 
 <!-- Форма выбора месяца -->
 <form method="get" class="mb-6 flex gap-4 items-end">
@@ -19,7 +19,7 @@
 
 <!-- Блок отчёта -->
 {% for title, days, period in [("1–15", first_half, first_half_range), ("16–конец", second_half, second_half_range)] %}
-<h3 class="text-xl font-semibold mt-8 mb-2">🗓 Период: {{ period[0] }} — {{ period[1] }} ({{ title }})</h3>
+<h3 class="text-xl font-semibold mt-8 mb-2">🗓 Период: {{ period[0] | e }} — {{ period[1] | e }} ({{ title | e }})</h3>
 
 <table class="w-full text-sm border">
   <thead class="bg-gray-100">
@@ -36,15 +36,15 @@
     {% set total_returns = 0 %}
     {% for day in days %}
     <tr>
-      <td class="p-2 border">{{ day.date }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(day.orders) }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(day.returns) }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(day.cashbox) }}</td>
+      <td class="p-2 border">{{ day.date | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(day.orders) | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(day.returns) | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(day.cashbox) | e }}</td>
       {% set total_cash = total_cash + day.orders %}
       {% set total_returns = total_returns + day.returns %}
       <td class="p-2 border">
         {% for uid in day.employees %}
-          {{ user_map.get(uid, "—") }}<br>
+          {{ user_map.get(uid, "—") | e }}<br>
         {% endfor %}
       </td>
     </tr>
@@ -53,9 +53,9 @@
   <tfoot class="bg-gray-100 font-semibold">
     <tr>
       <td class="p-2 border text-right" colspan="1">ИТОГО:</td>
-      <td class="p-2 border">{{ "%.2f"|format(total_cash) }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(total_returns) }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(total_cash - total_returns) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(total_cash) | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(total_returns) | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(total_cash - total_returns) | e }}</td>
     </tr>
   </tfoot>
 </table>
@@ -89,7 +89,7 @@
 
     {% for uid in user_totals.keys() %}
     <tr>
-    <td class="p-2 border">👤 {{ user_map.get(uid, "Неизвестно") }}</td>
+    <td class="p-2 border">👤 {{ user_map.get(uid, "Неизвестно") | e }}</td>
 
     {% set ns = namespace(fixed=0, percent=0) %}
     {% for day in days %}
@@ -103,8 +103,8 @@
 
     {% set payouts = payouts_1_15 if title == "1–15" else payouts_16_31 %}
     {% set paid = payouts.get(uid, 0) %}
-    <td class="p-2 border">{{ "%.2f"|format(paid) }}</td>
-    <td class="p-2 border">{{ "%.2f"|format(ns.fixed + ns.percent - paid) }}</td>
+    <td class="p-2 border">{{ "%.2f"|format(paid) | e }}</td>
+    <td class="p-2 border">{{ "%.2f"|format(ns.fixed + ns.percent - paid) | e }}</td>
     <td class="p-2 border">
         <form method="post" action="/reports/pay">
         <input type="hidden" name="user_id" value="{{ uid }}">

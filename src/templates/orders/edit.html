@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
-  <h2 class="text-xl font-semibold mb-4">Редактировать заказ #{{ order.id }}</h2>
+  <h2 class="text-xl font-semibold mb-4">Редактировать заказ #{{ order.id | e }}</h2>
   <form method="post" class="flex flex-col gap-4">
     <input type="text" name="phone_number" value="{{ order.phone_number }}" required class="border p-2 rounded" />
     <input type="date" name="date_" value="{{ order.date }}" required class="border p-2 rounded" />

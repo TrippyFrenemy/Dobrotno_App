@@ -25,7 +25,11 @@ async def login_page(request: Request):
     return templates.TemplateResponse("auth/login.html", {"request": request})
 
 @router.post("/login")
-async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_async_session)):
+async def login(
+    request: Request, 
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    session: AsyncSession = Depends(get_async_session
+)):
     stmt = select(User).where(User.email == form_data.username)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
@@ -41,7 +45,18 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         key="Authorization",
         value=f"Bearer {access_token}",
         httponly=True,
+        secure=True,
+        samesite="Lax",
         max_age=1800,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="Lax",
+        max_age=604800,
         path="/",
     )
     return response
@@ -64,8 +79,8 @@ async def refresh_token(request: Request):
         await redis.set(f"refresh_token:{user_id}", new_refresh)
 
         response = JSONResponse(content={"message": "Token refreshed"})
-        response.set_cookie("Authorization", f"Bearer {new_access}", httponly=True, max_age=1800)
-        response.set_cookie("refresh_token", new_refresh, httponly=True, max_age=604800)
+        response.set_cookie("Authorization", f"Bearer {new_access}", httponly=True, secure=True, samesite="Lax", max_age=1800)
+        response.set_cookie("refresh_token", new_refresh, httponly=True, secure=True, samesite="Lax", max_age=604800)
         return response
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid refresh token")

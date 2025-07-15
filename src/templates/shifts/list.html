@@ -18,16 +18,16 @@
   <tbody>
     {% for shift in shifts %}
     <tr>
-      <td class="p-2 border">{{ shift.date }}</td>
-      <td class="p-2 border">{{ shift.location.value }}</td>
+      <td class="p-2 border">{{ shift.date | e  }}</td>
+      <td class="p-2 border">{{ shift.location.value | e }}</td>
       <td class="p-2 border">
         <ul class="list-disc list-inside">
         {% for a in shift.assignments %}
-          <li>{{ a.user.name }}</li>
+          <li>{{ a.user.name | e }}</li>
         {% endfor %}
         </ul>
       </td>
-      <td class="p-2 border">{{ shift.created_by_user.name }}</td>
+      <td class="p-2 border">{{ shift.created_by_user.name | e }}</td>
       <td class="p-2 border">
         <a href="/shifts/{{ shift.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
         {% if user.role == 'admin' %}
