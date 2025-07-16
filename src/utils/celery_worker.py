@@ -8,6 +8,13 @@ celery_app = Celery(
     include=["src.tasks.backup", "src.tasks.cleanup"]
 )
 
+celery_app.conf.broker_transport_options = {
+    "visibility_timeout": 3600,
+    "socket_keepalive": True,
+    "retry_on_timeout": True,
+    "max_retries": 3
+}
+
 celery_app.conf.timezone = "UTC"
 celery_app.conf.beat_schedule = {
     "backup-every-12-hours": {
