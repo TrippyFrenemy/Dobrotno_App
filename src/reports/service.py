@@ -23,78 +23,13 @@ def get_half_month_periods(month: int, year: int):
     return first_half, second_half
 
 
-async def get_cash_and_returns(session: AsyncSession, target_date: date):
-    # Касса (сумма заказов)
-    orders_q = await session.execute(
-        select(func.sum(Order.amount)).where(Order.date == target_date)
-    )
-    orders = orders_q.scalar() or Decimal("0.00")
-
-    # Возвраты
-    returns_q = await session.execute(
-        select(func.sum(Return.amount)).where(Return.date == target_date)
-    )
-    returns = returns_q.scalar() or Decimal("0.00")
-
-    return orders, returns
-
-
-async def calc_daily_salary(session: AsyncSession, target_date: date, orders_amount: Decimal, returns_amount: Decimal):
-    shifts_q = await session.execute(
-        select(Shift)
-        .where(Shift.date == target_date)
-        .options(selectinload(Shift.assignments).selectinload(ShiftAssignment.user))
-    )
-    shifts = shifts_q.scalars().all()
-
-    cashbox = orders_amount - returns_amount
-
-    fixed = defaultdict(Decimal)
-    percent = defaultdict(Decimal)
-
-    for shift in shifts:
-        assignments = shift.assignments
-        employees = [a for a in assignments if a.user.role == UserRole.EMPLOYEE]
-
-        # 💰 Сотрудники TikTok — % от кассы
-        if shift.location == ShiftLocation.tiktok:
-            # if len(employees) == 1:
-            #     employee = employees[0]
-            #     fixed[employee.user_id] += employee.user.default_rate
-            #     percent[employee.user_id] += round(cashbox * employee.user.default_percent * 2 / 100, 2)
-            # elif len(employees) == 2:
-            for e in employees:
-                fixed[e.user_id] += e.user.default_rate
-                percent[e.user_id] += round(cashbox * e.user.default_percent / 100)
-
-        # 💼 Сотрудники обычных локаций — ставка
-        else:
-            for a in employees:
-                fixed[a.user_id] += round(a.user.default_rate, 2)
-
-        # 👤 Создатель смены — админ или менеджер
-    orders_q = await session.execute(
-        select(Order.created_by, func.sum(Order.amount))
-        .where(Order.date == target_date)
-        .group_by(Order.created_by)
-    )
-    order_creators = orders_q.all()
-
-    for user_id, total_amount in order_creators:
-        user_q = await session.execute(select(User).where(User.id == user_id))
-        user = user_q.scalar_one_or_none()
-        if not user:
-            continue
-        if user.role in [UserRole.ADMIN, UserRole.MANAGER]:
-            fixed[user.id] += user.default_rate
-            percent[user.id] += round((total_amount - returns_amount) * user.default_percent / 100)
-
-    return {
-        "fixed": dict(fixed),
-        "percent": dict(percent)
-    }
-
-async def get_monthly_report(session: AsyncSession, start: date, end: date):
+async def get_monthly_report(
+    session: AsyncSession, 
+    start: date, 
+    end: date,
+    current_user: User    
+):
+    
     users_q = await session.execute(select(User))
     users = {u.id: u for u in users_q.scalars().all()}
 
@@ -149,9 +84,15 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
             employees.update(a.user_id for a in assignments)
 
             if shift.location == ShiftLocation.tiktok:
-                for a in assignments:
-                    fixed[a.user_id] += a.user.default_rate
-                    percent[a.user_id] += round(cashbox * a.user.default_percent / 100)
+                if len(assignments) == 1:
+                    ass = assignments[0]
+                    fixed[ass.user_id] += ass.user.default_rate
+                    percent[ass.user_id] += round(cashbox * ass.user.default_percent / 100)
+                elif len(employees) == 2:
+                    for e in assignments:
+                        fixed[e.user_id] += e.user.default_rate
+                        cashbox_perc = cashbox / len(employees)
+                        percent[e.user_id] += round((cashbox_perc * e.user.default_percent) / 100)
             else:
                 for a in assignments:
                     fixed[a.user_id] += round(a.user.default_rate)
@@ -164,12 +105,29 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
                 percent[uid] += round((amount - returns) * user.default_percent / 100)
 
         # Финальные суммы
+        # salary_by_user = {
+        #     uid: fixed[uid] + percent[uid] for uid in set(fixed) | set(percent)
+        # }
+        # for uid in salary_by_user:
+        #     fixed_total[uid] += fixed[uid]
+        #     percent_total[uid] += percent[uid]
+
+        # Финальные суммы
         salary_by_user = {
-            uid: fixed[uid] + percent[uid] for uid in set(fixed) | set(percent)
+            uid: fixed[uid] + percent[uid]
+            for uid in set(fixed) | set(percent)
+            if not (current_user.role == UserRole.MANAGER and users.get(uid).role == UserRole.ADMIN)
         }
-        for uid in salary_by_user:
-            fixed_total[uid] += fixed[uid]
-            percent_total[uid] += percent[uid]
+        salary_fixed_by_user = {
+            uid: fixed[uid]
+            for uid in fixed
+            if not (current_user.role == UserRole.MANAGER and users.get(uid).role == UserRole.ADMIN)
+        }
+        salary_percent_by_user = {
+            uid: percent[uid]
+            for uid in percent
+            if not (current_user.role == UserRole.MANAGER and users.get(uid).role == UserRole.ADMIN)
+        }
 
         result.append({
             "date": current,
@@ -177,8 +135,10 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
             "returns": returns,
             "cashbox": cashbox,
             "salary_by_user": salary_by_user,
-            "salary_fixed_by_user": dict(fixed),
-            "salary_percent_by_user": dict(percent),
+            "salary_fixed_by_user": salary_fixed_by_user,
+            "salary_percent_by_user": salary_percent_by_user,
+            # "salary_fixed_by_user": dict(fixed),
+            # "salary_percent_by_user": dict(percent),
             "employees": list(employees),
             "creators": list(day_orders.keys()),
         })
@@ -188,10 +148,26 @@ async def get_monthly_report(session: AsyncSession, start: date, end: date):
     return result
 
 
-async def get_payouts_for_period(session: AsyncSession, start: date, end: date):
+async def get_payouts_for_period(session: AsyncSession, start: date, end: date, current_user: User):
+    # Загружаем пользователей один раз
+    users_q = await session.execute(select(User.id, User.role))
+    user_roles = {uid: role for uid, role in users_q.all()}
+
+    # Загружаем выплаты
     q = await session.execute(
         select(Payout.user_id, func.sum(Payout.amount))
         .where(and_(Payout.date >= start, Payout.date <= end))
         .group_by(Payout.user_id)
     )
-    return dict(q.all())
+    payouts = dict(q.all())
+
+    # Фильтрация: если менеджер — не показываем выплаты администраторам
+    if current_user.role == UserRole.MANAGER:
+        payouts = {
+            uid: amount
+            for uid, amount in payouts.items()
+            if user_roles.get(uid) != UserRole.ADMIN
+        }
+
+    return payouts
+

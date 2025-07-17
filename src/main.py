@@ -107,7 +107,7 @@ app.include_router(
     router=reports_router, 
     prefix="/reports", 
     tags=["Reports"],
-    dependencies=[Depends(get_admin_user)]
+    # dependencies=[Depends(get_admin_user)]
 )
 
 

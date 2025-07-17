@@ -3,6 +3,31 @@
 
 {% block content %}
 <h2 class="text-2xl font-semibold mb-4">Список заказов</h2>
+
+<form method="get" class="mb-6 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm font-medium text-gray-700">День</label>
+    <input type="number" name="day" value="{{ day or '' }}" min="1" max="31" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Месяц</label>
+    <input type="number" name="month" value="{{ month or '' }}" min="1" max="12" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Год</label>
+    <input type="number" name="year" value="{{ year or '' }}" class="border p-2 rounded w-28">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Сортировка</label>
+    <select name="sort_by" class="border p-2 rounded">
+      <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>По созданию</option>
+      <option value="date" {% if sort_by == 'date' %}selected{% endif %}>По дате</option>
+    </select>
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+</form>
+
+
 {% if orders %}
 <h3 class="text-xl font-semibold mb-3">Результаты</h3>
 <table class="w-full text-sm border">

@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, delete, insert, select
+from sqlalchemy import and_, delete, extract, insert, select
 from sqlalchemy.orm import joinedload
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from src.shifts.models import Shift
@@ -51,38 +51,82 @@ async def create_order(
     return response
 
 @router.get("/all/list", response_class=HTMLResponse)
-async def list_orders(
+async def list_orders_all(
     request: Request,
+    day: Optional[int] = Query(None),
+    month: Optional[int] = Query(datetime.today().month),
+    year: Optional[int] = Query(datetime.today().year),
+    sort_by: str = Query("created_at"),  # "created_at" или "date"
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_admin_user),
 ):
-    stmt = select(Order).options(joinedload(Order.created_by_user))
+    filters = [extract("month", Order.date) == month, extract("year", Order.date) == year]
+    if day:
+        filters.append(extract("day", Order.date) == day)
 
-    result = await session.execute(stmt.order_by(Order.date.desc()))
+    stmt = select(Order).where(and_(*filters)).options(joinedload(Order.created_by_user))
+
+    if sort_by == "created_at":
+        stmt = stmt.order_by(Order.created_at.desc())
+    else:
+        stmt = stmt.order_by(Order.date.desc())
+
+    result = await session.execute(stmt)
     orders = result.scalars().all()
 
     return templates.TemplateResponse("orders/list.html", {
         "request": request,
         "orders": orders,
         "user": user,
+        "day": day,
+        "month": month,
+        "year": year,
+        "sort_by": sort_by,
     })
 
+
 @router.get("/{id}/list", response_class=HTMLResponse)
-async def list_orders(
+async def list_orders_user(
+    id: int,
     request: Request,
+    day: Optional[int] = Query(None),
+    month: Optional[int] = Query(datetime.today().month),
+    year: Optional[int] = Query(datetime.today().year),
+    sort_by: str = Query("created_at"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
-    stmt = select(Order).where(Order.created_by == user.id)
+    if user.id != id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Нет доступа к чужим заказам")
 
-    result = await session.execute(stmt.order_by(Order.date.desc()))
+    filters = [
+        Order.created_by == id,
+        extract("month", Order.date) == month,
+        extract("year", Order.date) == year
+    ]
+    if day:
+        filters.append(extract("day", Order.date) == day)
+
+    stmt = select(Order).where(and_(*filters))
+
+    if sort_by == "created_at":
+        stmt = stmt.order_by(Order.created_at.desc())
+    else:
+        stmt = stmt.order_by(Order.date.desc())
+
+    result = await session.execute(stmt)
     orders = result.scalars().all()
 
     return templates.TemplateResponse("orders/list.html", {
         "request": request,
         "orders": orders,
         "user": user,
+        "day": day,
+        "month": month,
+        "year": year,
+        "sort_by": sort_by,
     })
+
 
 @router.get("/{order_id}/edit", response_class=HTMLResponse)
 async def edit_order_page(

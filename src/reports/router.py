@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.payouts.models import Payout, RoleType
 from src.shifts.models import Shift, ShiftLocation
 from src.database import get_async_session
-from src.auth.dependencies import get_admin_user
+from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.reports.service import get_half_month_periods, get_monthly_report, get_payouts_for_period
 from src.users.models import User
 
@@ -22,13 +22,13 @@ async def monthly_report_page(
     month: int = Query(None, ge=1, le=12),
     year: int = Query(None),
     session: AsyncSession = Depends(get_async_session),
-    user = Depends(get_admin_user),
+    user = Depends(get_manager_or_admin),
 ):
     today = date.today()
 
     # Выбор по умолчанию: текущий или предыдущий месяц
     if not month or not year:
-        if today.day <= 14:
+        if today.day <= 7:
             target = today.replace(day=1) - timedelta(days=1)
         else:
             target = today
@@ -39,14 +39,15 @@ async def monthly_report_page(
 
     users_q = await session.execute(select(User))
     users = users_q.scalars().all()
+    
     user_map = {u.id: u.name for u in users}
 
     # Сбор данных за обе половины
-    data_1_15 = await get_monthly_report(session, first_half[0], first_half[1])
-    data_16_31 = await get_monthly_report(session, second_half[0], second_half[1])
+    data_1_15 = await get_monthly_report(session, first_half[0], first_half[1], current_user=user)
+    data_16_31 = await get_monthly_report(session, second_half[0], second_half[1], current_user=user)
 
-    payouts_1_15 = await get_payouts_for_period(session, first_half[0], first_half[1])
-    payouts_16_31 = await get_payouts_for_period(session, second_half[0], second_half[1])
+    payouts_1_15 = await get_payouts_for_period(session, first_half[0], first_half[1], current_user=user)
+    payouts_16_31 = await get_payouts_for_period(session, second_half[0], second_half[1], current_user=user)
 
     return templates.TemplateResponse("reports/monthly.html", {
         "request": request,
@@ -68,7 +69,7 @@ async def make_payout(
     date: date = Form(...),
     amount: Decimal = Form(...),
     session: AsyncSession = Depends(get_async_session),
-    admin_user: User = Depends(get_admin_user)
+    payer_user: User = Depends(get_manager_or_admin)
 ):
     # получаем user
     user = await session.get(User, user_id)

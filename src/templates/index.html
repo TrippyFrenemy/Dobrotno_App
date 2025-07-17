@@ -34,13 +34,11 @@
 
 <!-- 📊 Смены и касса -->
 <div class="mb-6">
-  <h3 class="text-lg font-semibold text-gray-700 mb-2">📊 Смены {% if user.role == 'admin' %}и касса{% endif %}</h3>
+  <h3 class="text-lg font-semibold text-gray-700 mb-2">📊 Смены и касса</h3>
   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
     <a href="/shifts/create" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-center">📅 Добавить смену</a>
     <a href="/shifts/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📈 Список смен</a>
-    {% if user.role == 'admin' %}
     <a href="/reports/monthly" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📊 Отчёт по месяцам</a>
-    {% endif %}
   </div>
 </div>
 
