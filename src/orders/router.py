@@ -13,22 +13,28 @@ from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.orders.models import Order
 from src.users.models import User
+from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
 router = APIRouter()
 templates = Jinja2Templates(directory="src/templates")
 
 @router.get("/create", response_class=HTMLResponse)
 async def create_order_page(request: Request, user: User = Depends(get_manager_or_admin)):
-    return templates.TemplateResponse("orders/create.html", {"request": request})
+    csrf_token = await generate_csrf_token(user.id)
+    return templates.TemplateResponse("orders/create.html", {"request": request, "csrf_token": csrf_token})
 
 @router.post("/create")
 async def create_order(
     phone_number: str = Form(...),
     date_: date = Form(...),
     amount: Decimal = Form(...),
+    csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin)
 ):
+    if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+    
     if abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
 
@@ -135,13 +141,15 @@ async def edit_order_page(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
+    сsrf_token = await generate_csrf_token(user.id)
     order = await session.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
     return templates.TemplateResponse("orders/edit.html", {
         "request": request,
         "order": order,
-        "user": user
+        "user": user,
+        "csrf_token": сsrf_token
     })
 
 
@@ -151,9 +159,13 @@ async def update_order(
     phone_number: str = Form(...),
     date_: date = Form(...),
     amount: Decimal = Form(...),
+    csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
+    if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+    
     if abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
 

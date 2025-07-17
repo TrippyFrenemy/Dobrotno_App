@@ -10,16 +10,20 @@
       <th class="p-2 border">Дата и время</th>
       <th class="p-2 border">Пользователь</th>
       <th class="p-2 border">Действие</th>
-      <th class="p-2 border">Путь</th>
+      <th class="p-2 border">IP</th>
+      <th class="p-2 border">Код</th>
+      <th class="p-2 border">User-Agent</th>
     </tr>
   </thead>
   <tbody>
     {% for log in logs %}
     <tr>
       <td class="p-2 border">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') | e }}</td>
-      <td class="p-2 border">{{ log.user.name | e if log.user else "-" }}</td>
-      <td class="p-2 border">{{ log.action | e }}</td>
-      <td class="p-2 border text-xs text-gray-600">{{ log.path | e }}</td>
+      <td class="p-2 border">{{ log.user.name if log.user else "-" | e}}</td>
+      <td class="p-2 border">{{ log.action | e}}</td>
+      <td class="p-2 border text-xs">{{ log.ip_address or "-" | e}}</td>
+      <td class="p-2 border text-center">{{ log.status_code or "-" | e}}</td>
+      <td class="p-2 border text-xs text-gray-600">{{ log.user_agent or "-" | e}}</td>
     </tr>
     {% endfor %}
   </tbody>

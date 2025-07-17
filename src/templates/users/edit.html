@@ -6,6 +6,7 @@
 <div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
   <h2 class="text-xl font-semibold mb-4">Редактировать {{ user.name | e }}</h2>
   <form method="post" class="flex flex-col gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="text" name="name" value="{{ user.name }}" required class="border p-2 rounded" />
     <input type="text" name="email" value="{{ user.email }}" required class="border p-2 rounded" />
     <select name="role" class="border p-2 rounded">

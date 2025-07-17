@@ -18,9 +18,11 @@ SECRET_MANAGER = os.environ.get("SECRET_MANAGER")
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("TG_CHAT_ID")
 
-ADMIN_EMAIL=os.environ.get("ADMIN_EMAIL")
-ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD")
-ADMIN_NAME=os.environ.get("ADMIN_NAME")
-ADMIN_ROLE=os.environ.get("ADMIN_ROLE")
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+ADMIN_NAME = os.environ.get("ADMIN_NAME")
+ADMIN_ROLE = os.environ.get("ADMIN_ROLE")
 
-CELERY_BACHUP_RATE=float(os.environ.get("CELERY_BACHUP_RATE"))
+CSRF_TOKEN_EXPIRY = int(os.environ.get("CSRF_TOKEN_EXPIRY"))
+
+CELERY_BACHUP_RATE = int(os.environ.get("CELERY_BACHUP_RATE"))

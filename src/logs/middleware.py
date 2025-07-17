@@ -32,17 +32,32 @@ class LogUserActionMiddleware(BaseHTTPMiddleware):
 
         path = request.url.path
         method = request.method
+        query = str(request.url.query)
+        ip = request.client.host
+        ua = request.headers.get("user-agent", "unknown")
+
         skip = re.match(r"/(static|favicon|auth/refresh)", path)
-        if not skip:
-            logger.info(f"[{datetime.now()}] {user_id} {method} {path}")
-            async with async_session_maker() as session:
-                log = UserLog(
-                    user_id=user_id,
-                    action=f"{method} {path}",
-                    path=path
-                )
-                session.add(log)
-                await session.commit()
+        if skip:
+            return await call_next(request)
 
         response = await call_next(request)
+        status_code = response.status_code
+
+        logger.info(f"[{datetime.now()}] {ip} {user_id} {method} {path}?{query} UA={ua} {status_code}")
+
+        async with async_session_maker() as session:
+            log = UserLog(
+                user_id=user_id,
+                action=f"{method} {path}" + (f"?{query}" if query else ""),
+                path=path,
+                ip_address=ip,
+                user_agent=ua[:250],
+                status_code=status_code,
+                query_string=query
+            )
+            session.add(log)
+            await session.commit()
+
         return response
+
+        

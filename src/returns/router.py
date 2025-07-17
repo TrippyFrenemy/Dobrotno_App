@@ -11,22 +11,28 @@ from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.returns.models import Return
 from src.users.models import User
+from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
 router = APIRouter()
 templates = Jinja2Templates(directory="src/templates")
 
 @router.get("/create", response_class=HTMLResponse)
 async def create_return_page(request: Request, user: User = Depends(get_manager_or_admin)):
-    return templates.TemplateResponse("returns/create.html", {"request": request})
+    сsrf_token = await generate_csrf_token(user.id)
+    return templates.TemplateResponse("returns/create.html", {"request": request, "csrf_token": сsrf_token})
 
 @router.post("/create")
 async def create_return(
     date_: date = Form(...),
     amount: Decimal = Form(...),
     reason: str = Form(""),
+    csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin)
 ):
+    if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
     if abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата возврата должна быть в пределах 14 дней от сегодняшней")
 
@@ -65,10 +71,12 @@ async def list_returns_user(
 
 @router.get("/{return_id}/edit", response_class=HTMLResponse)
 async def edit_return_page(return_id: int, request: Request, session: AsyncSession = Depends(get_async_session), user: User = Depends(get_manager_or_admin)):
+    сsrf_token = await generate_csrf_token(user.id)
+
     ret = await session.get(Return, return_id)
     if not ret:
         raise HTTPException(status_code=404, detail="Возврат не найден")
-    return templates.TemplateResponse("returns/edit.html", {"request": request, "ret": ret})
+    return templates.TemplateResponse("returns/edit.html", {"request": request, "ret": ret, "csrf_token": сsrf_token})
 
 @router.post("/{return_id}/edit", response_class=RedirectResponse)
 async def update_return(
@@ -76,9 +84,13 @@ async def update_return(
     date_: date = Form(...),
     amount: Decimal = Form(...),
     reason: str = Form(""),
+    csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
+    if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+    
     if abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата возврата должна быть в пределах 14 дней от сегодняшней")
 

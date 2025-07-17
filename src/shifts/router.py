@@ -12,6 +12,7 @@ from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.users.models import User, UserRole
 from src.shifts.models import Shift, ShiftAssignment, ShiftLocation
+from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
 router = APIRouter(tags=["Shifts"])
 templates = Jinja2Templates(directory="src/templates")
@@ -24,11 +25,23 @@ async def create_shift_page(
     session: AsyncSession = Depends(get_async_session),
     date: Optional[date] = Query(None)
 ):
+    csrf_token = await generate_csrf_token(user.id)
+
     result = await session.execute(
         select(User).where(User.is_active == True, User.role == UserRole.EMPLOYEE)
     )
     users = result.scalars().all()
-    return templates.TemplateResponse("shifts/create.html", {"request": request, "user": user, "users": users, "locations": list(ShiftLocation), "prefill_date": date})
+    return templates.TemplateResponse(
+        "shifts/create.html", 
+        {
+            "request": request, 
+            "user": user, 
+            "users": users, 
+            "locations": list(ShiftLocation), 
+            "prefill_date": date, 
+            "csrf_token": csrf_token
+        }
+    )
 
 # 🛠️ Обработка формы создания смены
 @router.post("/create")
@@ -36,9 +49,13 @@ async def create_shift(
     date_: date = Form(...),
     location: ShiftLocation = Form(...),
     employees: List[int] = Form(...),
+    csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_manager_or_admin)
 ):
+    if not csrf_token or not await verify_csrf_token(current_user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
     if abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата смены должна быть в пределах 14 дней от сегодняшней")
 
@@ -98,6 +115,8 @@ async def edit_shift_page(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin)
 ):
+    csrf_token = await generate_csrf_token(user.id)
+
     shift = await session.get(Shift, shift_id, options=[
         joinedload(Shift.assignments).joinedload(ShiftAssignment.user)
     ])
@@ -116,7 +135,8 @@ async def edit_shift_page(
         "shift": shift,
         "users": users,
         "assigned_ids": assigned_ids,
-        "locations": list(ShiftLocation)
+        "locations": list(ShiftLocation),
+        "csrf_token": csrf_token,
     })
 
 
@@ -126,9 +146,13 @@ async def update_shift(
     date_: date = Form(...),
     location: ShiftLocation = Form(...),
     employees: List[int] = Form(...),
+    csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_manager_or_admin)
 ):
+    if not csrf_token or not await verify_csrf_token(current_user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
     shift = await session.get(Shift, shift_id, options=[joinedload(Shift.assignments)])
     if not shift:
         raise HTTPException(status_code=404, detail="Смена не найдена")
