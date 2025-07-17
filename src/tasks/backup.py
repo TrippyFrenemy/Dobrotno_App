@@ -24,7 +24,7 @@ def send_db_backup_task():
 
     try:
         subprocess.run(
-            ["pg_dump", "-h", DB_HOST, "-U", DB_USER, "-d", DB_NAME, "-f", filename],
+            ["pg_dump", "-h", DB_HOST, "-U", DB_USER, "-d", DB_NAME, "--exclude-table=user_logs", "-f", filename],
             check=True,
             env={**os.environ, "PGPASSWORD": DB_PASS}
         )
