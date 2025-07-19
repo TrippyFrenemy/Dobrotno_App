@@ -11,10 +11,11 @@ from src.auth.tokens import create_access_token, create_refresh_token, decode_to
 from src.users.models import User
 from src.database import get_async_session
 from sqlalchemy.future import select
+from src.logs.middleware import logger
 from src.config import REDIS_HOST, REDIS_PORT
+from src.utils.ratelimit import is_blocked, register_failed_attempt, delete_attempt
 
 templates = Jinja2Templates(directory="src/templates")
-
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -30,12 +31,21 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), 
     session: AsyncSession = Depends(get_async_session
 )):
+    ip = request.client.host
+
+    if await is_blocked(ip):
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Подождите 10 минут.")
+
     stmt = select(User).where(User.email == form_data.username)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     if not user or not pwd_context.verify(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
+        await register_failed_attempt(ip)
+        logger.warning(f"[LOGIN FAILED] email={form_data.username} ip={request.client.host}")
+        raise HTTPException(status_code=401, detail="Неверные данные")
+    
+    await delete_attempt
+    logger.info(f"[LOGIN SUCCESS] {user.email} from {request.client.host}")
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
     await redis.set(f"refresh_token:{user.id}", refresh_token)
