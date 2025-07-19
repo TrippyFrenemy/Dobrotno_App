@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Отчёт по кофейне{% endblock %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">📋 Отчёт по кассе</h2>
+<table class="w-full border text-sm">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Дата</th>
+      <th class="p-2 border">Касса</th>
+      <th class="p-2 border">Бариста</th>
+      <th class="p-2 border">Ставка</th>
+      <th class="p-2 border">%</th>
+      <th class="p-2 border font-bold">ЗП</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in records %}
+    <tr>
+      <td class="p-2 border">{{ row.record.date }}</td>
+      <td class="p-2 border">{{ row.record.total_cash }}</td>
+      <td class="p-2 border">{{ row.record.barista.name }}</td>
+      <td class="p-2 border">{{ row.record.barista.default_rate }}</td>
+      <td class="p-2 border">{{ row.record.barista.default_percent }}%</td>
+      <td class="p-2 border font-semibold">{{ row.payout }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

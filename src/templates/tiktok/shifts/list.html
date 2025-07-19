@@ -4,6 +4,25 @@
 {% block content %}
 <h2 class="text-2xl font-semibold mb-4">Список смен</h2>
 
+<form method="get" class="mb-6 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Месяц</label>
+    <input type="number" name="month" value="{{ month or '' }}" min="1" max="12" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Год</label>
+    <input type="number" name="year" value="{{ year or '' }}" class="border p-2 rounded w-28">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Сортировка</label>
+    <select name="sort_by" class="border p-2 rounded">
+      <option value="desc" {% if sort_by == 'desc' %}selected{% endif %}>По убыванию даты</option>
+      <option value="asc" {% if sort_by == 'asc' %}selected{% endif %}>По возрастанию даты</option>
+    </select>
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+</form>
+
 {% if shifts %}
 <table class="w-full text-sm border">
   <thead class="bg-gray-100">

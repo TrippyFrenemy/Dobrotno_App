@@ -12,6 +12,7 @@
     <select name="role" class="border p-2 rounded">
       <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Администратор (Не ставить не Аврущенко)</option>
       <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Менеджер</option>
+      <option value="coffee" {% if user.role == 'coffee' %}selected{% endif %}>Бариста</option>
       <option value="employee" {% if user.role == 'employee' %}selected{% endif %}>Сотрудник</option>
     </select>
     <input type="number" name="default_rate" step="1" value="{{ user.default_rate }}" class="border p-2 rounded" placeholder="Ставка (грн)"/>

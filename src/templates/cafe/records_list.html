@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Записи кофейни{% endblock %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Записи смен</h2>
+<a href="/cafe/{{ shop_id }}/records/create" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">➕ Добавить запись</a>
+<table class="w-full border text-sm">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Дата</th>
+      <th class="p-2 border">Сумма</th>
+      <th class="p-2 border">Терминал</th>
+      <th class="p-2 border">Наличные</th>
+      <th class="p-2 border">Траты</th>
+      <th class="p-2 border">Бариста</th>
+      <th class="p-2 border">Действия</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for rec in records %}
+    <tr>
+      <td class="p-2 border">{{ rec.date | e}}</td>
+      <td class="p-2 border">{{ rec.total_cash | e}}</td>
+      <td class="p-2 border">{{ rec.terminal  | e}}</td>
+      <td class="p-2 border">{{ rec.cash | e}}</td>
+      <td class="p-2 border">{{ rec.expenses | e}}</td>
+      <td class="p-2 border">{{ rec.barista.name | e}}</td>
+      <td class="p-2 border">
+        <form method="post" action="/cafe/{{ rec.shop_id }}/records/delete/{{ rec.id }}" onsubmit="return confirm('Удалить?')">
+          <button class="text-red-600 hover:underline">Удалить</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

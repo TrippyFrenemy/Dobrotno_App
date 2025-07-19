@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Кофейни{% endblock %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Список кофеен</h2>
+<a href="/cafe/create" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">➕ Новая кофейня</a>
+<ul class="space-y-2">
+  {% for shop in shops %}
+  <li class="p-4 bg-white rounded shadow flex justify-between items-center">
+    <span>{{ shop.name | e}}</span>
+    <a href="/cafe/{{ shop.id }}/records" class="text-blue-600 hover:underline">Перейти</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

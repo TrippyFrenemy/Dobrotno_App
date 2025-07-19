@@ -4,8 +4,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from sqlalchemy import select, insert
-from datetime import date
+from sqlalchemy import and_, extract, select, insert
+from datetime import date, datetime
 from typing import List, Optional
 
 from src.database import get_async_session
@@ -88,22 +88,34 @@ async def create_shift(
 @router.get("/list", response_class=HTMLResponse)
 async def shift_list_page(
     request: Request,
+    month: Optional[int] = Query(datetime.today().month),
+    year: Optional[int] = Query(datetime.today().year),
+    sort_by: str = Query(default="desc"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
-    stmt = select(Shift).options(
+    filters = [extract("month", Shift.date) == month, extract("year", Shift.date) == year]
+
+    stmt = (select(Shift)
+    .where(and_(*filters))
+    .options(
         joinedload(Shift.assignments).joinedload(ShiftAssignment.user),
         joinedload(Shift.created_by_user)
-    ).order_by(Shift.date.desc())
+    ))
 
-    if user.role == "manager":
-        stmt = stmt.where(Shift.created_by == user.id)
+    if sort_by == "desc":
+        stmt = stmt.order_by(Shift.date.desc())
+    else:
+        stmt = stmt.order_by(Shift.date)
 
     result = await session.execute(stmt)
     shifts = result.scalars().unique().all()
 
     return templates.TemplateResponse("tiktok/shifts/list.html", {
         "request": request,
+        "month": month,
+        "year": year,
+        "sort_by": sort_by,
         "user": user,
         "shifts": shifts
     })
