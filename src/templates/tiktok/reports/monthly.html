@@ -32,16 +32,15 @@
     </tr>
   </thead>
   <tbody>
-    {% set total_cash = 0 %}
-    {% set total_returns = 0 %}
+    {% set ns = namespace(total_cash=0.0, total_returns=0.0) %}
     {% for day in days %}
     <tr>
       <td class="p-2 border">{{ day.date | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.orders) | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.returns) | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.cashbox) | e }}</td>
-      {% set total_cash = total_cash + day.orders %}
-      {% set total_returns = total_returns + day.returns %}
+      {% set ns.total_cash = ns.total_cash + (day.orders | float) %}
+      {% set ns.total_returns = ns.total_returns + (day.returns | float) %}
       <td class="p-2 border">
         {% for uid in day.employees %}
           {{ user_map.get(uid, "—") | e }}<br>
@@ -53,12 +52,13 @@
   <tfoot class="bg-gray-100 font-semibold">
     <tr>
       <td class="p-2 border text-right" colspan="1">ИТОГО:</td>
-      <td class="p-2 border">{{ "%.2f"|format(total_cash) | e }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(total_returns) | e }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(total_cash - total_returns) | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(ns.total_cash) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(ns.total_returns) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(ns.total_cash - ns.total_returns) }}</td>
     </tr>
   </tfoot>
 </table>
+
 
 <!-- Блок по сотрудникам -->
 <h4 class="text-lg font-semibold mt-4">👥 Зарплаты по сотрудникам (ставка + %)</h4>
