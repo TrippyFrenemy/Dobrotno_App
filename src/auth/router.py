@@ -44,7 +44,7 @@ async def login(
         logger.warning(f"[LOGIN FAILED] email={form_data.username} ip={request.client.host}")
         raise HTTPException(status_code=401, detail="Неверные данные")
     
-    await delete_attempt
+    await delete_attempt(ip)
     logger.info(f"[LOGIN SUCCESS] {user.email} from {request.client.host}")
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
