@@ -6,11 +6,11 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.payouts.models import Payout, RoleType
-from src.shifts.models import Shift, ShiftLocation
+from src.tiktok.payouts.models import Payout, RoleType
+from src.tiktok.shifts.models import Shift, ShiftLocation
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
-from src.reports.service import get_half_month_periods, get_monthly_report, get_payouts_for_period
+from src.tiktok.reports.service import get_half_month_periods, get_monthly_report, get_payouts_for_period
 from src.users.models import User
 
 router = APIRouter()
@@ -49,7 +49,7 @@ async def monthly_report_page(
     payouts_1_15 = await get_payouts_for_period(session, first_half[0], first_half[1], current_user=user)
     payouts_16_31 = await get_payouts_for_period(session, second_half[0], second_half[1], current_user=user)
 
-    return templates.TemplateResponse("reports/monthly.html", {
+    return templates.TemplateResponse("tiktok/reports/monthly.html", {
         "request": request,
         "user": user,
         "user_map": user_map,

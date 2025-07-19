@@ -19,10 +19,11 @@ from src.users.models import User, UserRole
 
 from src.auth.router import router as auth_router
 from src.users.router import router as users_router
-from src.orders.router import router as orders_router
-from src.returns.router import router as returns_router
-from src.shifts.router import router as shifts_router
-from src.reports.router import router as reports_router
+from src.tiktok.router import router as tiktok_router
+# from src.tiktok.orders.router import router as orders_router
+# from src.tiktok.returns.router import router as returns_router
+# from src.tiktok.shifts.router import router as shifts_router
+# from src.tiktok.reports.router import router as reports_router
 from src.logs.router import router as logs_router
 from src.utils.create_admin import create_admin_user
 
@@ -86,30 +87,9 @@ app.include_router(
 )
 
 app.include_router(
-    router=orders_router,
-    prefix="/orders",
-    tags=["Orders"],
+    router=tiktok_router,
+    tags=["TikTok"],
 )
-
-app.include_router(
-    router=returns_router,
-    prefix="/returns",
-    tags=["Returns"],
-)
-
-app.include_router(
-    router=shifts_router,
-    prefix="/shifts",
-    tags=["Shifts"],
-)
-
-app.include_router(
-    router=reports_router, 
-    prefix="/reports", 
-    tags=["Reports"],
-    # dependencies=[Depends(get_admin_user)]
-)
-
 
 app.include_router(
     router=logs_router,

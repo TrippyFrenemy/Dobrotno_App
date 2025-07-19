@@ -11,7 +11,7 @@ from typing import List, Optional
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.users.models import User, UserRole
-from src.shifts.models import Shift, ShiftAssignment, ShiftLocation
+from src.tiktok.shifts.models import Shift, ShiftAssignment, ShiftLocation
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
 router = APIRouter(tags=["Shifts"])
@@ -32,7 +32,7 @@ async def create_shift_page(
     )
     users = result.scalars().all()
     return templates.TemplateResponse(
-        "shifts/create.html", 
+        "tiktok/shifts/create.html", 
         {
             "request": request, 
             "user": user, 
@@ -102,7 +102,7 @@ async def shift_list_page(
     result = await session.execute(stmt)
     shifts = result.scalars().unique().all()
 
-    return templates.TemplateResponse("shifts/list.html", {
+    return templates.TemplateResponse("tiktok/shifts/list.html", {
         "request": request,
         "user": user,
         "shifts": shifts
@@ -130,7 +130,7 @@ async def edit_shift_page(
 
     assigned_ids = [a.user_id for a in shift.assignments]
 
-    return templates.TemplateResponse("shifts/edit.html", {
+    return templates.TemplateResponse("tiktok/shifts/edit.html", {
         "request": request,
         "shift": shift,
         "users": users,

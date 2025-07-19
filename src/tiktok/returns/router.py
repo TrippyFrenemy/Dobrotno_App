@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
-from src.returns.models import Return
+from src.tiktok.returns.models import Return
 from src.users.models import User
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory="src/templates")
 @router.get("/create", response_class=HTMLResponse)
 async def create_return_page(request: Request, user: User = Depends(get_manager_or_admin)):
     сsrf_token = await generate_csrf_token(user.id)
-    return templates.TemplateResponse("returns/create.html", {"request": request, "csrf_token": сsrf_token})
+    return templates.TemplateResponse("tiktok/returns/create.html", {"request": request, "csrf_token": сsrf_token})
 
 @router.post("/create")
 async def create_return(
@@ -55,7 +55,7 @@ async def list_returns_all(
     stmt = select(Return).options(joinedload(Return.created_by_user)).order_by(Return.date.desc())
     result = await session.execute(stmt)
     returns = result.scalars().all()
-    return templates.TemplateResponse("returns/list.html", {"request": request, "returns": returns, "user": user})
+    return templates.TemplateResponse("tiktok/returns/list.html", {"request": request, "returns": returns, "user": user})
 
 @router.get("/{user_id}/list", response_class=HTMLResponse)
 async def list_returns_user(
@@ -67,7 +67,7 @@ async def list_returns_user(
     stmt = select(Return).where(Return.created_by == user.id).order_by(Return.date.desc())
     result = await session.execute(stmt)
     returns = result.scalars().all()
-    return templates.TemplateResponse("returns/list.html", {"request": request, "returns": returns, "user": user})
+    return templates.TemplateResponse("tiktok/returns/list.html", {"request": request, "returns": returns, "user": user})
 
 @router.get("/{return_id}/edit", response_class=HTMLResponse)
 async def edit_return_page(return_id: int, request: Request, session: AsyncSession = Depends(get_async_session), user: User = Depends(get_manager_or_admin)):
@@ -76,7 +76,7 @@ async def edit_return_page(return_id: int, request: Request, session: AsyncSessi
     ret = await session.get(Return, return_id)
     if not ret:
         raise HTTPException(status_code=404, detail="Возврат не найден")
-    return templates.TemplateResponse("returns/edit.html", {"request": request, "ret": ret, "csrf_token": сsrf_token})
+    return templates.TemplateResponse("tiktok/returns/edit.html", {"request": request, "ret": ret, "csrf_token": сsrf_token})
 
 @router.post("/{return_id}/edit", response_class=RedirectResponse)
 async def update_return(

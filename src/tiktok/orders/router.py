@@ -8,10 +8,10 @@ from sqlalchemy.orm import joinedload
 from datetime import date, datetime
 from decimal import Decimal
 
-from src.shifts.models import Shift
+from src.tiktok.shifts.models import Shift
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
-from src.orders.models import Order
+from src.tiktok.orders.models import Order
 from src.users.models import User
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
@@ -21,7 +21,7 @@ templates = Jinja2Templates(directory="src/templates")
 @router.get("/create", response_class=HTMLResponse)
 async def create_order_page(request: Request, user: User = Depends(get_manager_or_admin)):
     csrf_token = await generate_csrf_token(user.id)
-    return templates.TemplateResponse("orders/create.html", {"request": request, "csrf_token": csrf_token})
+    return templates.TemplateResponse("tiktok/orders/create.html", {"request": request, "csrf_token": csrf_token})
 
 @router.post("/create")
 async def create_order(
@@ -80,7 +80,7 @@ async def list_orders_all(
     result = await session.execute(stmt)
     orders = result.scalars().all()
 
-    return templates.TemplateResponse("orders/list.html", {
+    return templates.TemplateResponse("tiktok/orders/list.html", {
         "request": request,
         "orders": orders,
         "user": user,
@@ -123,7 +123,7 @@ async def list_orders_user(
     result = await session.execute(stmt)
     orders = result.scalars().all()
 
-    return templates.TemplateResponse("orders/list.html", {
+    return templates.TemplateResponse("tiktok/orders/list.html", {
         "request": request,
         "orders": orders,
         "user": user,
@@ -145,7 +145,7 @@ async def edit_order_page(
     order = await session.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
-    return templates.TemplateResponse("orders/edit.html", {
+    return templates.TemplateResponse("tiktok/orders/edit.html", {
         "request": request,
         "order": order,
         "user": user,

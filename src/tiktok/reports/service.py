@@ -6,11 +6,11 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.orders.models import Order
-from src.returns.models import Return
-from src.shifts.models import Shift, ShiftAssignment, ShiftLocation
+from src.tiktok.orders.models import Order
+from src.tiktok.returns.models import Return
+from src.tiktok.shifts.models import Shift, ShiftAssignment, ShiftLocation
 from src.users.models import User, UserRole
-from src.payouts.models import Payout
+from src.tiktok.payouts.models import Payout
 
 
 def get_half_month_periods(month: int, year: int):
@@ -63,8 +63,6 @@ async def get_monthly_report(
 
     # Единый проход по дням
     result = []
-    fixed_total = defaultdict(Decimal)
-    percent_total = defaultdict(Decimal)
     current = start
 
     while current <= end:
@@ -105,14 +103,6 @@ async def get_monthly_report(
                 percent[uid] += round((amount - returns) * user.default_percent / 100)
 
         # Финальные суммы
-        # salary_by_user = {
-        #     uid: fixed[uid] + percent[uid] for uid in set(fixed) | set(percent)
-        # }
-        # for uid in salary_by_user:
-        #     fixed_total[uid] += fixed[uid]
-        #     percent_total[uid] += percent[uid]
-
-        # Финальные суммы
         salary_by_user = {
             uid: fixed[uid] + percent[uid]
             for uid in set(fixed) | set(percent)
@@ -137,8 +127,6 @@ async def get_monthly_report(
             "salary_by_user": salary_by_user,
             "salary_fixed_by_user": salary_fixed_by_user,
             "salary_percent_by_user": salary_percent_by_user,
-            # "salary_fixed_by_user": dict(fixed),
-            # "salary_percent_by_user": dict(percent),
             "employees": list(employees),
             "creators": list(day_orders.keys()),
         })
