@@ -1,29 +1,95 @@
 {% extends "base.html" %}
 {% block title %}Отчёт по кофейне{% endblock %}
 {% block content %}
-<h2 class="text-xl font-semibold mb-4">📋 Отчёт по кассе</h2>
-<table class="w-full border text-sm">
+<h2 class="text-2xl font-semibold mb-4">📊 Отчёт по кофейне за {{ month }}/{{ year }}</h2>
+
+<form method="get" class="mb-6 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm">Месяц</label>
+    <input type="number" name="month" value="{{ month }}" min="1" max="12" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm">Год</label>
+    <input type="number" name="year" value="{{ year }}" class="border p-2 rounded w-32">
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+</form>
+
+{% for label, records, range_start, range_end in [
+  ("1–15", first_half, first_start, first_end),
+  ("16–конец", second_half, second_start, second_end)
+] %}
+<h3 class="text-xl font-semibold mt-8 mb-2">🗓 Период: {{ range_start }} — {{ range_end }} ({{ label }})</h3>
+
+<table class="w-full text-sm border mb-4">
   <thead class="bg-gray-100">
     <tr>
       <th class="p-2 border">Дата</th>
       <th class="p-2 border">Касса</th>
+      <th class="p-2 border">Терминал</th>
+      <th class="p-2 border">Наличные</th>
+      <th class="p-2 border">Траты</th>
       <th class="p-2 border">Бариста</th>
-      <th class="p-2 border">Ставка</th>
-      <th class="p-2 border">%</th>
-      <th class="p-2 border font-bold">ЗП</th>
+      <th class="p-2 border">ЗП</th>
     </tr>
   </thead>
   <tbody>
+    {% set ns = namespace(total_cash=0, total_term=0, total_cash_only=0, total_exp=0, total_salary=0) %}
     {% for row in records %}
     <tr>
-      <td class="p-2 border">{{ row.record.date }}</td>
-      <td class="p-2 border">{{ row.record.total_cash }}</td>
-      <td class="p-2 border">{{ row.record.barista.name }}</td>
-      <td class="p-2 border">{{ row.record.barista.default_rate }}</td>
-      <td class="p-2 border">{{ row.record.barista.default_percent }}%</td>
-      <td class="p-2 border font-semibold">{{ row.payout }}</td>
+      <td class="p-2 border">{{ row.record.date if row.record else row.date }}</td>
+      <td class="p-2 border">{{ row.record.total_cash if row.record else '' }}</td>
+      <td class="p-2 border">{{ row.record.terminal if row.record else '' }}</td>
+      <td class="p-2 border">{{ row.record.cash if row.record else '' }}</td>
+      <td class="p-2 border">{{ row.record.expenses if row.record else '' }}</td>
+      <td class="p-2 border">{{ row.record.barista.name if row.record else '' }}</td>
+      <td class="p-2 border">{{ row.payout }}</td>
+
+      {% if row.record %}
+        {% set ns.total_cash = ns.total_cash + row.record.total_cash %}
+        {% set ns.total_term = ns.total_term + row.record.terminal %}
+        {% set ns.total_cash_only = ns.total_cash_only + row.record.cash %}
+        {% set ns.total_exp = ns.total_exp + row.record.expenses %}
+        {% set ns.total_salary = ns.total_salary + row.payout %}
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot class="bg-gray-50 font-semibold">
+    <tr>
+      <td class="p-2 border">Итого</td>
+      <td class="p-2 border">{{ ns.total_cash }}</td>
+      <td class="p-2 border">{{ ns.total_term }}</td>
+      <td class="p-2 border">{{ ns.total_cash_only }}</td>
+      <td class="p-2 border">{{ ns.total_exp }}</td>
+      <td class="p-2 border"></td>
+      <td class="p-2 border">{{ ns.total_salary }}</td>
+    </tr>
+    <tr>
+      <td class="p-2 border font-bold text-right" colspan="6">Чистая прибыль</td>
+      <td class="p-2 border font-bold">{{ ns.total_cash - ns.total_exp - ns.total_salary }}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<h4 class="text-lg font-semibold mt-4">👥 По сотрудникам</h4>
+<table class="w-full text-sm border mb-8">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Сотрудник</th>
+      <th class="p-2 border">%</th>
+      <th class="p-2 border">ЗП</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for user_id, info in user_summary[label].items() %}
+    <tr>
+      <td class="p-2 border">{{ info.name }}</td>
+      <td class="p-2 border">{{ info.percent }}%</td>
+      <td class="p-2 border">{{ info.total }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+{% endfor %}
 {% endblock %}

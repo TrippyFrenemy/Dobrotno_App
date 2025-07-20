@@ -2,6 +2,25 @@
 {% block title %}Записи кофейни{% endblock %}
 {% block content %}
 <h2 class="text-xl font-semibold mb-4">Записи смен</h2>
+<form method="get" class="mb-4 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm">Месяц</label>
+    <input type="number" name="month" value="{{ month }}" min="1" max="12" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm">Год</label>
+    <input type="number" name="year" value="{{ year }}" class="border p-2 rounded w-32">
+  </div>
+  <div>
+    <label class="block text-sm">Сортировка</label>
+    <select name="sort_by" class="border p-2 rounded">
+      <option value="desc" {% if order == "desc" %}selected{% endif %}>По убыванию</option>
+      <option value="asc" {% if order == "asc" %}selected{% endif %}>По возрастанию</option>
+    </select>
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Фильтровать</button>
+</form>
+
 <a href="/cafe/{{ shop_id }}/records/create" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">➕ Добавить запись</a>
 <table class="w-full border text-sm">
   <thead class="bg-gray-100">
@@ -25,6 +44,7 @@
       <td class="p-2 border">{{ rec.expenses | e}}</td>
       <td class="p-2 border">{{ rec.barista.name | e}}</td>
       <td class="p-2 border">
+        <a href="/cafe/{{ rec.shop_id }}/records/edit/{{ rec.id }}" class="text-blue-600 hover:underline">Изменить</a>
         <form method="post" action="/cafe/{{ rec.shop_id }}/records/delete/{{ rec.id }}" onsubmit="return confirm('Удалить?')">
           <button class="text-red-600 hover:underline">Удалить</button>
         </form>
