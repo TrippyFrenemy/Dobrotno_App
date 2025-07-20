@@ -66,16 +66,18 @@ async def list_orders_all(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_admin_user),
 ):
-    filters = [extract("month", Order.date) == month, extract("year", Order.date) == year]
-    if day:
-        filters.append(extract("day", Order.date) == day)
+    filters = [
+        extract("day", Order.date) == day,
+        extract("month", Order.date) == month, 
+        extract("year", Order.date) == year
+    ]
 
     stmt = select(Order).where(and_(*filters)).options(joinedload(Order.created_by_user))
 
     if sort_by == "created_at":
         stmt = stmt.order_by(Order.created_at.desc())
     else:
-        stmt = stmt.order_by(Order.date.desc())
+        stmt = stmt.order_by(Order.created_at)
 
     result = await session.execute(stmt)
     orders = result.scalars().all()
@@ -107,18 +109,17 @@ async def list_orders_user(
 
     filters = [
         Order.created_by == id,
+        extract("day", Order.date) == day,
         extract("month", Order.date) == month,
         extract("year", Order.date) == year
     ]
-    if day:
-        filters.append(extract("day", Order.date) == day)
 
     stmt = select(Order).where(and_(*filters))
 
     if sort_by == "created_at":
         stmt = stmt.order_by(Order.created_at.desc())
     else:
-        stmt = stmt.order_by(Order.date.desc())
+        stmt = stmt.order_by(Order.created_at)
 
     result = await session.execute(stmt)
     orders = result.scalars().all()
