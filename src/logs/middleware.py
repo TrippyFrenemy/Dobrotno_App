@@ -10,6 +10,8 @@ from src.users.models import User
 import re
 import os
 
+from src.utils.ip import get_real_ip
+
 logfile_path = "/fastapi_app/logs/user_activity.log"
 os.makedirs(os.path.dirname(logfile_path), exist_ok=True)
 
@@ -33,7 +35,7 @@ class LogUserActionMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         method = request.method
         query = str(request.url.query)
-        ip = request.client.host
+        ip = await get_real_ip(request)
         ua = request.headers.get("user-agent", "unknown")
 
         skip = re.match(r"/(static|favicon|auth/refresh)", path)

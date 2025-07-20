@@ -101,11 +101,3 @@ app.include_router(
     tags=["Logs"],
     dependencies=[Depends(get_admin_user)]
 )
-
-@app.get("/debug/ip")
-async def debug_ip(request: Request):
-    return {
-        "client_host": request.client.host,
-        "x-forwarded-for": request.headers.get("x-forwarded-for"),
-        "x-real-ip": request.headers.get("x-real-ip"),
-    }
