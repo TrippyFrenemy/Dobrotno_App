@@ -25,19 +25,41 @@ async def create_order_page(request: Request, user: User = Depends(get_manager_o
 
 @router.post("/create")
 async def create_order(
+    request: Request,
     phone_number: str = Form(...),
     date_: date = Form(...),
     amount: Decimal = Form(...),
     csrf_token: str = Form(...),
+    confirm: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin)
 ):
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
-    
+
     if abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
 
+    # 🔹 Проверка дубликатов
+    stmt = select(Order).where(
+        Order.phone_number == phone_number,
+        Order.date == date_,
+        Order.amount == amount
+    )
+    result = await session.execute(stmt)
+    existing_order = result.scalar_one_or_none()
+
+    if existing_order and confirm != "yes":
+        # Показываем страницу с подтверждением
+        return templates.TemplateResponse("tiktok/orders/confirm_duplicate.html", {
+            "request": request,
+            "phone_number": phone_number,
+            "date_": date_.isoformat(),
+            "amount": amount,
+            "csrf_token": await generate_csrf_token(user.id),
+        })
+
+    # 🔹 Создание заказа
     stmt = insert(Order).values(
         phone_number=phone_number,
         date=date_,

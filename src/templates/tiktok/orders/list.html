@@ -33,18 +33,20 @@
 <table class="w-full text-sm border">
   <thead class="bg-gray-100">
     <tr>
+      <th class="p-2 border">№</th>
       <th class="p-2 border">Дата</th>
       <th class="p-2 border">Телефон</th>
       <th class="p-2 border">Сумма</th>
-      <th class="p-2 border">Действия</th>
       {% if user.role == 'admin' %}
       <th class="p-2 border">Создатель</th>
       {% endif %}
+      <th class="p-2 border">Действия</th>
     </tr>
   </thead>
   <tbody>
     {% for order in orders %}
     <tr>
+      <td class="p-2 border">{{ loop.index }}</td>
       <td class="p-2 border">{{ order.date | e }}</td>
       <td class="p-2 border">{{ order.phone_number | e }}</td>
       <td class="p-2 border">{{ order.amount | e }}</td>
