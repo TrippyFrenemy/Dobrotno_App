@@ -81,9 +81,9 @@ async def create_order(
 @router.get("/all/list", response_class=HTMLResponse)
 async def list_orders_all(
     request: Request,
-    day: Optional[int] = Query(datetime.today().day),
-    month: Optional[int] = Query(datetime.today().month),
-    year: Optional[int] = Query(datetime.today().year),
+    day: Optional[int] = Query(date.today().day),
+    month: Optional[int] = Query(date.today().month),
+    year: Optional[int] = Query(date.today().year),
     sort_by: str = Query("created_at"),  # "created_at" или "date"
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_admin_user),
@@ -119,9 +119,9 @@ async def list_orders_all(
 async def list_orders_user(
     id: int,
     request: Request,
-    day: Optional[int] = Query(datetime.today().day),
-    month: Optional[int] = Query(datetime.today().month),
-    year: Optional[int] = Query(datetime.today().year),
+    day: Optional[int] = Query(date.today().day),
+    month: Optional[int] = Query(date.today().month),
+    year: Optional[int] = Query(date.today().year),
     sort_by: str = Query("created_at"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
