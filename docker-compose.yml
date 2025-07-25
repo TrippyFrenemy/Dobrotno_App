@@ -23,7 +23,8 @@ services:
       - .env
     command: celery -A src.utils.celery_worker worker --loglevel=info
     volumes:
-      - .:/app
+      - .:/fastapi_app
+      - ./tmp:/fastapi_app/tmp
     depends_on:
       - redis
       # - db
@@ -36,7 +37,8 @@ services:
       - .env
     command: celery -A src.utils.celery_worker beat --loglevel=info
     volumes:
-      - .:/app
+      - .:/fastapi_app
+      - ./tmp:/fastapi_app/tmp
     depends_on:
       - redis
       - celery
@@ -48,7 +50,7 @@ services:
     entrypoint: ["./entrypoint.sh"]
     volumes:
       - .:/fastapi_app
-      - ./tmp:/fastapi_app/src/utils/tmp
+      - ./tmp:/fastapi_app/tmp
     ports:
       - "8000:8000"
     env_file:

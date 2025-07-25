@@ -1,7 +1,8 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from src.database import Base
+from src.database import Base, metadata
+from src.users.models import User
 
 class UserLog(Base):
     __tablename__ = "user_logs"

@@ -23,6 +23,6 @@ celery_app.conf.beat_schedule = {
     },
     "clean-old-logs-daily": {
         "task": "src.tasks.cleanup.clean_old_logs",
-        "schedule": 86400, # 24 hours in seconds
+        "schedule": 86000, # 24 hours in seconds - 400
     },
 }

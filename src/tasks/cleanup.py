@@ -8,7 +8,7 @@ from celery import shared_task
 def clean_old_logs():
     async def _clean():
         async with async_session_maker() as session:
-            cutoff = datetime.utcnow() - timedelta(days=7)
+            cutoff = datetime.now() - timedelta(days=7)
             await session.execute(delete(UserLog).where(UserLog.timestamp < cutoff))
             await session.commit()
     import asyncio
