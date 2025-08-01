@@ -17,7 +17,7 @@ services:
     depends_on:
       - redis
     environment:
-      - TZ=UTC
+      - TZ=Europe/Kyiv
   
   beat:
     build: .
