@@ -9,12 +9,13 @@ from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from src.database import get_async_session
-from src.auth.dependencies import get_admin_user
+from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.users.models import User, UserRole
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 from .models import Store, StoreShiftRecord, StoreShiftEmployee
 from src.tiktok.reports.service import get_half_month_periods
 
+from src.config import MANAGER_EMAIL, MANAGER_ROLE
 
 async def compute_salary(
     session: AsyncSession,
@@ -42,6 +43,14 @@ async def compute_salary(
         total += user.default_rate
     return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+async def get_config_manager(session: AsyncSession) -> User | None:
+    if not MANAGER_EMAIL:
+        return None
+    q = await session.execute(
+        select(User).where(User.email == MANAGER_EMAIL, User.is_active == True)
+    )
+    return q.scalars().first()
+
 router = APIRouter()
 templates = Jinja2Templates(directory="src/templates")
 
@@ -50,20 +59,20 @@ templates = Jinja2Templates(directory="src/templates")
 async def list_stores(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_admin_user),
+    user: User = Depends(get_manager_or_admin),
 ):
     result = await session.execute(select(Store))
     stores = result.scalars().all()
     if len(stores) == 1:
         store = stores[0]
         return RedirectResponse(f"/stores/{store.id}/records", status_code=302)
-    return templates.TemplateResponse("stores/stores_list.html", {"request": request, "stores": stores})
+    return templates.TemplateResponse("stores/stores_list.html", {"request": request, "stores": stores, "user": user})
 
 
 @router.get("/create", response_class=HTMLResponse)
-async def create_store_page(request: Request, user: User = Depends(get_admin_user)):
+async def create_store_page(request: Request, user: User = Depends(get_manager_or_admin)):
     csrf_token = await generate_csrf_token(user.id)
-    return templates.TemplateResponse("stores/create_store.html", {"request": request, "csrf_token": csrf_token})
+    return templates.TemplateResponse("stores/create_store.html", {"request": request, "csrf_token": csrf_token, "user": user})
 
 
 @router.post("/create")
@@ -71,7 +80,7 @@ async def create_store(
     name: str = Form(...),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_admin_user),
+    user: User = Depends(get_manager_or_admin),
 ):
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
@@ -87,7 +96,7 @@ async def store_records(
     month: int = Query(None, ge=1, le=12),
     year: int = Query(None),
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_admin_user),
+    user: User = Depends(get_manager_or_admin),
 ):
     store = await session.get(Store, store_id)
     if not store:
@@ -115,7 +124,8 @@ async def store_records(
         .order_by(StoreShiftRecord.date)
     )
     records = q.scalars().all()
-
+    manager_user = await get_config_manager(session)
+    manager_id = manager_user.id if manager_user else None
     records_by_date = {r.date: r for r in records}
 
     def build_range(start: date, end: date):
@@ -145,7 +155,7 @@ async def store_records(
                         "cash": r.cash,
                         "terminal": r.terminal,
                         "employees": [
-                            {"id": e.user_id, "is_warehouse": e.is_warehouse} for e in r.employees
+                            {"id": e.user_id, "is_warehouse": e.is_warehouse} for e in r.employees  if e.user_id != manager_id
                         ],
                         "salary_by_user": salary_by_user,
                         "salary_fixed_by_user": {uid: fixed[uid].quantize(Decimal("0.01")) for uid in fixed},
@@ -189,6 +199,7 @@ async def store_records(
             "csrf_token": csrf_token,
             "first_half_range": first_range,
             "second_half_range": second_range,
+            "user": user,
         },
     )
 
@@ -198,7 +209,7 @@ async def create_record_page(
     store_id: int,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_admin_user),
+    user: User = Depends(get_manager_or_admin),
 ):
     csrf_token = await generate_csrf_token(user.id)
     store_q = await session.execute(select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True))
@@ -213,6 +224,7 @@ async def create_record_page(
             "warehouse_employees": warehouse_employees,
             "csrf_token": csrf_token,
             "store_id": store_id,
+            "user": user,
         },
     )
 
@@ -227,14 +239,19 @@ async def create_record(
     warehouse_employees: List[str] = Form([]),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_admin_user),
+    user: User = Depends(get_manager_or_admin),
 ):
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
     # if not store_employees:
     #     raise HTTPException(status_code=400, detail="Select at least one store employee")
+    
     store_employees = [int(uid) for uid in store_employees if uid.strip().isdigit()]
     warehouse_employees = [int(uid) for uid in warehouse_employees if uid.strip().isdigit()]
+    manager_user = await get_config_manager(session)
+    if manager_user and manager_user.id not in store_employees:
+        store_employees.append(manager_user.id)
+
     salary_expenses = await compute_salary(
         session, cash, terminal, store_employees, warehouse_employees
     )
@@ -284,7 +301,7 @@ async def edit_record_page(
     record_id: int,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_admin_user),
+    user: User = Depends(get_manager_or_admin),
 ):
     record = await session.get(
         StoreShiftRecord,
@@ -294,12 +311,17 @@ async def edit_record_page(
     if not record or record.store_id != store_id:
         raise HTTPException(status_code=404, detail="Record not found")
     csrf_token = await generate_csrf_token(user.id)
+    
     store_q = await session.execute(select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True))
     store_employees = store_q.scalars().all()
+    manager_user = await get_config_manager(session)
+    if manager_user and manager_user not in store_employees:
+        store_employees.append(manager_user)
     wh_q = await session.execute(select(User).where(User.role == UserRole.WAREHOUSE_WORKER, User.is_active == True))
     warehouse_employees = wh_q.scalars().all()
     selected_store = [e.user_id for e in record.employees if not e.is_warehouse]
     selected_warehouse = [e.user_id for e in record.employees if e.is_warehouse]
+    
     return templates.TemplateResponse(
         "stores/edit_record.html",
         {
@@ -311,6 +333,7 @@ async def edit_record_page(
             "selected_warehouse": selected_warehouse,
             "csrf_token": csrf_token,
             "store_id": store_id,
+            "user": user,
         },
     )
 
@@ -326,7 +349,7 @@ async def edit_record(
     warehouse_employees: List[str] = Form([]),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_admin_user),
+    user: User = Depends(get_manager_or_admin),
 ):
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
@@ -338,8 +361,13 @@ async def edit_record(
     record.date = date_
     record.cash = cash
     record.terminal = terminal
+
     store_employees = [int(uid) for uid in store_employees if uid.strip().isdigit()]
     warehouse_employees = [int(uid) for uid in warehouse_employees if uid.strip().isdigit()]
+    manager_user = await get_config_manager(session)
+    if manager_user and manager_user.id not in store_employees:
+        store_employees.append(manager_user.id)
+
     salary_expenses = await compute_salary(
         session, cash, terminal, store_employees, warehouse_employees
     )
