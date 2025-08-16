@@ -22,6 +22,8 @@ from src.users.router import router as users_router
 from src.tiktok.router import router as tiktok_router
 from src.cafe.router import router as coffee_router
 from src.logs.router import router as logs_router
+from src.stores.router import router as stores_router
+
 from src.utils.create_admin import create_admin_user
 
 from src.logs.middleware import LogUserActionMiddleware
@@ -92,6 +94,13 @@ app.include_router(
     router=coffee_router,
     prefix="/cafe",
     tags=["Cafe"],
+    dependencies=[Depends(get_admin_user)]
+)
+
+app.include_router(
+    router=stores_router,
+    prefix="/stores",
+    tags=["Stores"],
     dependencies=[Depends(get_admin_user)]
 )
 

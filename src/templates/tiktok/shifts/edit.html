@@ -8,7 +8,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <label>Дата</label>
-    <input type="date" name="date_" value="{{ shift.date }}" required class="border p-2 rounded">
+    <input type="date" name="date_" value="{{ shift.date }}" required class="border p-2 rounded" readonly>
 
     <label>Локация</label>
     <select name="location" class="border p-2 rounded">

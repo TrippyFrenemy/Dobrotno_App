@@ -17,7 +17,7 @@ class Payout(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(ForeignKey("users.id"), nullable=False)
     date = Column(Date, nullable=False)  # за какой день
-    location = Column(Enum("TikTok", "Wildberries", "Other", name="location_enum"), nullable=False)
+    location = Column(Enum("TikTok", "Store", "Other", name="location_enum"), nullable=False)
     role_type = Column(Enum(RoleType), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     paid_at = Column(DateTime, default=datetime.now)

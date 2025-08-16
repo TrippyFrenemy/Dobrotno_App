@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Магазины{% endblock %}
+{% block content %}
+<h2 class="text-xl font-semibold mb-4">Магазины</h2>
+<a href="/stores/create" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">➕ Добавить магазин</a>
+<ul class="list-disc pl-5">
+  {% for shop in stores %}
+  <li><a class="text-blue-600 hover:underline" href="/stores/{{ shop.id }}/records">{{ shop.name | e }}</a></li>
+  {% endfor %}
+</ul>
+{% endblock %}

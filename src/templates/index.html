@@ -3,46 +3,67 @@
 {% block title %}Главная{% endblock %}
 
 {% block content %}
-<h2 class="text-2xl font-semibold">Добро пожаловать, {{ user.name }}!</h2>
-<p class="mt-4 text-gray-700">Вы вошли как {{ user.role }}.</p>
+<div class="w-full px-4 lg:px-8 py-6">
+  <!-- Шапка -->
+  <header class="mb-10">
+    <h2 class="text-3xl font-bold mb-2">Добро пожаловать, {{ user.name }}!</h2>
+    <p class="text-gray-600">
+      Вы вошли как 
+      <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
+        <span class="h-2 w-2 rounded-full {% if user.role == 'admin' %}bg-red-500{% elif user.role == 'manager' %}bg-blue-500{% else %}bg-gray-400{% endif %}"></span>
+        {{ user.role }}
+      </span>
+    </p>
+  </header>
 
-{% if user.role in ['admin', 'manager'] %}
+  {% if user.role in ['admin', 'manager'] %}
+  <!-- Верхний ряд: Заказы, Возвраты, Смены -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 
-<!-- 📦 Заказы -->
-<div class="mb-6">
-  <h3 class="text-lg font-semibold text-gray-700 mb-2">📦 Заказы</h3>
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-    <a href="/orders/create" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center">➕ Добавить заказ</a>
-    <a href="/orders/{{ user.id }}/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📋 Список заказов {{ user.name }}</a>
-    {% if user.role == 'admin' %}
-    <a href="/orders/all/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📋 Список заказов всех пользователей</a>
-    {% endif %}
+    <!-- 📦 Заказы -->
+    <section class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-6 flex flex-col">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📦 Заказы</h3>
+      <div class="flex flex-col gap-3 flex-grow">
+        <a href="/orders/create" class="w-full text-center rounded-lg bg-blue-600 text-white px-5 py-2.5 hover:bg-blue-700 transition">➕ Добавить заказ</a>
+        <a href="/orders/{{ user.id }}/list" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📋 Список заказов {{ user.name }}</a>
+        {% if user.role == 'admin' %}
+        <a href="/orders/all/list" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📋 Список заказов всех пользователей</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- ↩️ Возвраты -->
+    <section class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-6 flex flex-col">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">↩️ Возвраты</h3>
+      <div class="flex flex-col gap-3 flex-grow">
+        <a href="/returns/create" class="w-full text-center rounded-lg bg-red-600 text-white px-5 py-2.5 hover:bg-red-700 transition">➖ Добавить возврат</a>
+        <a href="/returns/{{ user.id }}/list" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📄 Список возвратов {{ user.name }}</a>
+        {% if user.role == 'admin' %}
+        <a href="/returns/all/list" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📄 Список возвратов всех пользователей</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- 📊 Смены и касса -->
+    <section class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-6 flex flex-col">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Смены и касса</h3>
+      <div class="flex flex-col gap-3 flex-grow">
+        <a href="/shifts/create" class="w-full text-center rounded-lg bg-green-600 text-white px-5 py-2.5 hover:bg-green-700 transition">📅 Добавить смену</a>
+        <a href="/shifts/list" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📈 Список смен</a>
+        <a href="/reports/monthly" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📊 Отчёт по месяцам</a>
+      </div>
+    </section>
+
   </div>
+
+  <!-- Отдельная секция: Магазины -->
+  <section class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">🏬 Магазины</h3>
+    <div class="flex flex-col gap-3">
+      <a href="/stores/" class="w-full sm:w-64 text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">Список магазинов</a>
+    </div>
+  </section>
+
+  {% endif %}
 </div>
-
-<!-- ↩️ Возвраты -->
-<div class="mb-6">
-  <h3 class="text-lg font-semibold text-gray-700 mb-2">↩️ Возвраты</h3>
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-    <a href="/returns/create" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-center">➖ Добавить возврат</a>
-    <a href="/returns/{{ user.id }}/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📄 Список возвратов {{ user.name }}</a>
-    {% if user.role == 'admin' %}
-    <a href="/returns/all/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📄 Список возвратов всех пользователей</a>
-    {% endif %}
-  </div>
-</div>
-
-<!-- 📊 Смены и касса -->
-<div class="mb-6">
-  <h3 class="text-lg font-semibold text-gray-700 mb-2">📊 Смены и касса</h3>
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-    <a href="/shifts/create" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-center">📅 Добавить смену</a>
-    <a href="/shifts/list" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📈 Список смен</a>
-    <a href="/reports/monthly" class="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 text-center">📊 Отчёт по месяцам</a>
-  </div>
-</div>
-
-{% endif %}
-
-
 {% endblock %}

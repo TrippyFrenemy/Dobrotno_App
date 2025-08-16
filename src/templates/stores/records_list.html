@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Смены магазина{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">🛍️ Смены за {{ month }}/{{ year }}</h2>
+
+<a href="/stores/{{ store_id }}/records/create" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">➕ Добавить смену</a>
+
+<form method="get" class="mb-6 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm">Месяц</label>
+    <input type="number" name="month" value="{{ month }}" min="1" max="12" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm">Год</label>
+    <input type="number" name="year" value="{{ year }}" class="border p-2 rounded w-32">
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+</form>
+
+{% for title, days, period in [
+  ("1–15", first_half, first_half_range),
+  ("16–конец", second_half, second_half_range)
+] %}
+  <h3 class="text-xl font-semibold mt-8 mb-2">🗓 Период: {{ period[0] }} — {{ period[1] }} ({{ title }})</h3>
+
+  <table class="w-full text-sm border">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 border">Дата</th>
+        <th class="p-2 border">Касса</th>
+        <th class="p-2 border">Терминал</th>
+        <th class="p-2 border">Сотрудники</th>
+        <th class="p-2 border">Правка</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set ns = namespace(total_cash=0.0, total_terminal=0.0) %}
+      {% for rec in days %}
+      <tr>
+        <td class="p-2 border">{{ rec.date }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(rec.cash) }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(rec.terminal) }}</td>
+        {% set ns.total_cash = ns.total_cash + (rec.cash | float) %}
+        {% set ns.total_terminal = ns.total_terminal + (rec.terminal | float) %}
+        <td class="p-2 border">
+          {% for e in rec.employees %}
+            {{ user_map.get(e.id, '—') }}{% if e.is_warehouse %} (склад){% endif %}<br>
+          {% endfor %}
+        </td>
+        <td class="p-2 border">
+          <div class="flex justify-center gap-2">
+            <a href="/stores/{{ store_id }}/records/{{ rec.id }}/edit" class="text-blue-600 hover:underline">✏️</a>
+            <form method="post" action="/stores/{{ store_id }}/records/{{ rec.id }}/delete" onsubmit="return confirm('Удалить смену?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="text-red-600 hover:underline">🗑️</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="bg-gray-100 font-semibold">
+      <tr>
+        <td class="p-2 border text-right">ИТОГО:</td>
+        <td class="p-2 border">{{ '%.2f'|format(ns.total_cash) }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(ns.total_terminal) }}</td>
+        <td></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <h4 class="text-lg font-semibold mt-4">👥 Зарплаты по сотрудникам (ставка + %)</h4>
+  <table class="w-full text-sm border mb-8">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="p-2 border">Сотрудник</th>
+        <th class="p-2 border">По ставке</th>
+        <th class="p-2 border">Процент</th>
+        <th class="p-2 border">Итого</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set user_totals = dict() %}
+      {% for day in days %}
+        {% for uid, amount in day.salary_by_user.items() %}
+          {% if uid not in user_totals %}
+            {% set _ = user_totals.update({uid: amount}) %}
+          {% else %}
+            {% set _ = user_totals.update({uid: user_totals[uid] + amount}) %}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+
+      {% for uid in user_totals.keys() %}
+      <tr>
+        <td class="p-2 border">👤 {{ user_map.get(uid, '—') }}</td>
+        {% set ns = namespace(fixed=0, percent=0) %}
+        {% for day in days %}
+          {% set ns.fixed = ns.fixed + day.salary_fixed_by_user.get(uid, 0) %}
+          {% set ns.percent = ns.percent + day.salary_percent_by_user.get(uid, 0) %}
+        {% endfor %}
+        <td class="p-2 border">{{ '%.2f'|format(ns.fixed) }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(ns.percent) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endfor %}
+{% endblock %}

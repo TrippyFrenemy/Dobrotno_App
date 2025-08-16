@@ -189,7 +189,7 @@ async def update_order(
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
     
-    if abs((date.today() - date_).days) > 14:
+    if abs((date.today() - date_).days) > 14 and user.role != "admin":
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
 
     order = await session.get(Order, order_id)

@@ -14,6 +14,8 @@
       <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Менеджер</option>
       <option value="coffee" {% if user.role == 'coffee' %}selected{% endif %}>Бариста</option>
       <option value="employee" {% if user.role == 'employee' %}selected{% endif %}>Сотрудник</option>
+      <option value="store_worker" {% if user.role == 'store_worker' %}selected{% endif %}>Сотрудник Магазина</option>
+      <option value="warehouse_worker" {% if user.role == 'warehouse_worker' %}selected{% endif %}>Сотрудник Склада</option>
     </select>
     <input type="number" name="default_rate" step="1" value="{{ user.default_rate }}" class="border p-2 rounded" placeholder="Ставка (грн)"/>
     <input type="number" name="default_percent" step="1" value="{{ user.default_percent }}" class="border p-2 rounded" placeholder="Ставка (%)"/>
