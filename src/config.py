@@ -23,6 +23,11 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_NAME = os.environ.get("ADMIN_NAME")
 ADMIN_ROLE = os.environ.get("ADMIN_ROLE")
 
+MANAGER_EMAIL = os.environ.get("MANAGER_EMAIL")
+MANAGER_PASSWORD = os.environ.get("MANAGER_PASSWORD")
+MANAGER_NAME = os.environ.get("MANAGER_NAME")
+MANAGER_ROLE = os.environ.get("MANAGER_ROLE")
+
 CSRF_TOKEN_EXPIRY = int(os.environ.get("CSRF_TOKEN_EXPIRY"))
 
 CELERY_BACHUP_RATE = int(os.environ.get("CELERY_BACHUP_RATE"))

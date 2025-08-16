@@ -85,7 +85,7 @@ async def update_user(
     role: str = Form(...),
     default_rate: float = Form(0.0),
     default_percent: float = Form(1.0),
-    is_active: Optional[bool] = Form(True),
+    is_active: Optional[bool] = Form(False),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     admin: User = Depends(get_admin_user),

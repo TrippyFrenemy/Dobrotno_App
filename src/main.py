@@ -24,7 +24,11 @@ from src.cafe.router import router as coffee_router
 from src.logs.router import router as logs_router
 from src.stores.router import router as stores_router
 
-from src.utils.create_admin import create_admin_user
+from src.utils.create_preconfig_users import create_user
+from src.config import (
+    ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME, ADMIN_ROLE,
+    MANAGER_EMAIL, MANAGER_PASSWORD, MANAGER_NAME, MANAGER_ROLE,
+)
 
 from src.logs.middleware import LogUserActionMiddleware
 
@@ -32,7 +36,8 @@ from src.logs.middleware import LogUserActionMiddleware
 async def lifespan(app: FastAPI):
     os.makedirs("tmp", exist_ok=True)
     os.makedirs("src/static", exist_ok=True)
-    await create_admin_user()
+    await create_user(role=ADMIN_ROLE, email=ADMIN_EMAIL, name=ADMIN_NAME, password=ADMIN_PASSWORD, default_rate=0.0, default_percent=1.0)
+    await create_user(role=MANAGER_ROLE, email=MANAGER_EMAIL, name=MANAGER_NAME, password=MANAGER_PASSWORD, default_rate=1000.0, default_percent=0.0)
     yield
     # Cleanup actions can be added here if needed
 
