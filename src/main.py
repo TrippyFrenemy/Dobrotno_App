@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 import redis.asyncio as redis
 
-from src.auth.dependencies import get_admin_user, get_current_user
+from src.auth.dependencies import get_admin_user, get_current_user, get_manager_or_admin
 from src.users.models import User, UserRole
 
 from src.auth.router import router as auth_router
@@ -101,7 +101,7 @@ app.include_router(
     router=stores_router,
     prefix="/stores",
     tags=["Stores"],
-    dependencies=[Depends(get_admin_user)]
+    dependencies=[Depends(get_manager_or_admin)]
 )
 
 app.include_router(
