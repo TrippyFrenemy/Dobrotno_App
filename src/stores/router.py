@@ -89,6 +89,10 @@ async def store_records(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_admin_user),
 ):
+    store = await session.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    
     today = date.today()
     if not month or not year:
         if today.day <= 7:
@@ -97,7 +101,7 @@ async def store_records(
             target = today
         month = target.month
         year = target.year
-
+    
     first_range, second_range = get_half_month_periods(month, year)
 
     q = await session.execute(
@@ -176,6 +180,7 @@ async def store_records(
         {
             "request": request,
             "store_id": store_id,
+            "store_name": store.name,
             "month": month,
             "year": year,
             "first_half": data_first,

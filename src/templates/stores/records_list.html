@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Смены магазина{% endblock %}
 {% block content %}
-<h2 class="text-2xl font-semibold mb-4">🛍️ Смены за {{ month }}/{{ year }}</h2>
+<h2 class="text-2xl font-semibold mb-4">🛍️ Смены за {{ month }}/{{ year }} {{ store_name }}</h2>
 
 <a href="/stores/{{ store_id }}/records/create" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">➕ Добавить смену</a>
 
