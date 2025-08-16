@@ -30,7 +30,7 @@ async def compute_salary(
     q = await session.execute(select(User).where(User.id.in_(ids)))
     users = {u.id: u for u in q.scalars().all()}
     total = Decimal("0.00")
-    revenue = cash + terminal
+    revenue = cash
     for uid in store_ids:
         user = users.get(uid)
         if not user:
@@ -136,7 +136,7 @@ async def store_records(
             if r:
                 store_emps = [e for e in r.employees if not e.is_warehouse]
                 wh_emps = [e for e in r.employees if e.is_warehouse]
-                revenue = r.cash + r.terminal
+                revenue = r.cash
                 fixed: dict[int, Decimal] = {}
                 percent: dict[int, Decimal] = {}
                 for e in store_emps:
@@ -154,6 +154,7 @@ async def store_records(
                         "date": r.date,
                         "cash": r.cash,
                         "terminal": r.terminal,
+                        "cash_on_hand": r.cash_on_hand,
                         "employees": [
                             {"id": e.user_id, "is_warehouse": e.is_warehouse} for e in r.employees  if e.user_id != manager_id
                         ],
@@ -169,6 +170,7 @@ async def store_records(
                         "date": current,
                         "cash": Decimal("0.00"),
                         "terminal": Decimal("0.00"),
+                        "cash_on_hand": Decimal("0.00"),
                         "employees": [],
                         "salary_by_user": {},
                         "salary_fixed_by_user": {},
@@ -234,6 +236,7 @@ async def create_record(
     store_id: int,
     date_: date = Form(...),
     cash: Decimal = Form(...),
+    cash_on_hand: Decimal = Form(...),
     terminal: Decimal = Form(...),
     store_employees: List[str] = Form([]),
     warehouse_employees: List[str] = Form([]),
@@ -259,6 +262,7 @@ async def create_record(
         store_id=store_id,
         date=date_,
         cash=cash,
+        cash_on_hand=cash_on_hand,
         terminal=terminal,
         salary_expenses=salary_expenses,
     )
@@ -344,6 +348,7 @@ async def edit_record(
     record_id: int,
     date_: date = Form(...),
     cash: Decimal = Form(...),
+    cash_on_hand: Decimal = Form(...),
     terminal: Decimal = Form(...),
     store_employees: List[str] = Form([]),
     warehouse_employees: List[str] = Form([]),
@@ -361,6 +366,7 @@ async def edit_record(
     record.date = date_
     record.cash = cash
     record.terminal = terminal
+    record.cash_on_hand = cash_on_hand
 
     store_employees = [int(uid) for uid in store_employees if uid.strip().isdigit()]
     warehouse_employees = [int(uid) for uid in warehouse_employees if uid.strip().isdigit()]

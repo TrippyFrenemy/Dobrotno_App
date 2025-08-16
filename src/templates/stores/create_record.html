@@ -7,8 +7,9 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <input type="date" name="date_" required class="border p-2 rounded" />
-    <input type="number" step="0.01" name="cash" placeholder="Касса" required class="border p-2 rounded" />
+    <input type="number" step="0.01" name="cash" placeholder="Итоговая касса (Z)" required class="border p-2 rounded" />
     <input type="number" step="0.01" name="terminal" placeholder="Терминал" required class="border p-2 rounded" />
+    <input type="number" step="0.01" name="cash_on_hand" placeholder="Наличные в кассе (конец смены)" required class="border p-2 rounded" />
 
     <label>Сотрудники магазина</label>
     <select name="store_employees" multiple class="border p-2 rounded h-40">

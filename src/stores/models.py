@@ -17,6 +17,7 @@ class StoreShiftRecord(Base):
     store_id = Column(ForeignKey("stores.id"), nullable=False)
     date = Column(Date, nullable=False)
     cash = Column(Numeric(10, 2), nullable=False, default=0)
+    cash_on_hand = Column(Numeric(10, 2), nullable=False, default=0)
     terminal = Column(Numeric(10, 2), nullable=False, default=0)
     salary_expenses = Column(Numeric(10, 2), nullable=False, default=0)
 

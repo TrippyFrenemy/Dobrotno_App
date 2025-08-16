@@ -26,22 +26,29 @@
   <table class="w-full text-sm border">
     <thead class="bg-gray-100">
       <tr>
-        <th class="p-2 border">Дата</th>
-        <th class="p-2 border">Касса</th>
-        <th class="p-2 border">Терминал</th>
-        <th class="p-2 border">Сотрудники</th>
-        <th class="p-2 border">Правка</th>
+        <th class="p-2 border text-left">Дата</th>
+        <th class="p-2 border text-right">Итоговая касса (Z)</th>
+        <th class="p-2 border text-right">Терминал</th>
+        <th class="p-2 border text-right">Наличные по кассе</th>
+        <th class="p-2 border text-right">Наличные в кассе (конец)</th>
+        <th class="p-2 border text-left">Сотрудники</th>
+        <th class="p-2 border text-center">Правка</th>
       </tr>
     </thead>
     <tbody>
-      {% set ns = namespace(total_cash=0.0, total_terminal=0.0) %}
+      {% set ns = namespace(total_cash_proc=0.0, total_cash_on_hand=0.0, total_terminal=0.0, total_z=0.0) %}
       {% for rec in days %}
+        {% set z = (rec.cash | float) %}
+        {% set terminal = (rec.terminal | float) %}
+        {% set cash_processed = z - terminal %}
+        {% set cash_on_hand = (rec.cash_on_hand | float) if rec.cash_on_hand is defined else 0.0 %}
+
       <tr>
-        <td class="p-2 border">{{ rec.date }}</td>
-        <td class="p-2 border">{{ '%.2f'|format(rec.cash) }}</td>
-        <td class="p-2 border">{{ '%.2f'|format(rec.terminal) }}</td>
-        {% set ns.total_cash = ns.total_cash + (rec.cash | float) %}
-        {% set ns.total_terminal = ns.total_terminal + (rec.terminal | float) %}
+        <td class="p-2 border whitespace-nowrap">{{ rec.date }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(z) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(terminal) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(cash_processed) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(cash_on_hand) }}</td>
         <td class="p-2 border">
           {% for e in rec.employees %}
             {{ user_map.get(e.id, '—') }}{% if e.is_warehouse %} (склад){% endif %}<br>
@@ -61,15 +68,21 @@
             {% endif %}
           </td>
       </tr>
+        {% set ns.total_z = ns.total_z + z %}
+        {% set ns.total_terminal = ns.total_terminal + terminal %}
+        {% set ns.total_cash_proc = ns.total_cash_proc + cash_processed %}
+        {% set ns.total_cash_on_hand = ns.total_cash_on_hand + cash_on_hand %}
       {% endfor %}
     </tbody>
-    <tfoot class="bg-gray-100 font-semibold">
-      <tr>
+    <tfoot>
+      <tr class="bg-gray-50 font-semibold">
         <td class="p-2 border text-right">ИТОГО:</td>
-        <td class="p-2 border">{{ '%.2f'|format(ns.total_cash) }}</td>
-        <td class="p-2 border">{{ '%.2f'|format(ns.total_terminal) }}</td>
-        <td></td>
-        <td></td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_z) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_terminal) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_cash_proc) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_cash_on_hand) }}</td>
+        <td class="p-2 border"></td>
+        <td class="p-2 border"></td>
       </tr>
     </tfoot>
   </table>
@@ -81,7 +94,7 @@
         <th class="p-2 border">Сотрудник</th>
         <th class="p-2 border">По ставке</th>
         <th class="p-2 border">Процент</th>
-        <th class="p-2 border">Итого</th>
+        <!-- <th class="p-2 border">Итого</th> -->
       </tr>
     </thead>
     <tbody>
