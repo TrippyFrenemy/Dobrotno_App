@@ -106,12 +106,13 @@
     <td class="p-2 border">{{ "%.2f"|format(paid) | e }}</td>
     <td class="p-2 border">{{ "%.2f"|format(ns.fixed + ns.percent - paid) | e }}</td>
     <td class="p-2 border">
-        <form method="post" action="/reports/pay">
+        <!-- <form method="post" action="/reports/pay">
         <input type="hidden" name="user_id" value="{{ uid }}">
         <input type="hidden" name="date" value="{{ period[0] }}">
         <input type="number" step="0.01" name="amount" placeholder="0.00" class="border p-1 rounded w-24">
         <button class="text-green-600 hover:underline">Выплатить</button>
-        </form>
+        </form> -->
+        Услуга на доработке
     </td>
     </tr>
     {% endfor %}
