@@ -74,26 +74,54 @@ async def get_monthly_report(
 
         fixed = defaultdict(Decimal)
         percent = defaultdict(Decimal)
-        employees = set()
+        employee_details = []
 
         # Сотрудники по сменам
         for shift in shifts:
             assignments = [a for a in shift.assignments if a.user.role == UserRole.EMPLOYEE]
-            employees.update(a.user_id for a in assignments)
+            
+            if not assignments:
+                continue
 
             if shift.location == ShiftLocation.tiktok:
-                if len(assignments) == 1:
-                    ass = assignments[0]
-                    fixed[ass.user_id] += ass.user.default_rate
-                    percent[ass.user_id] += round(cashbox * ass.user.default_percent / 100)
-                elif len(employees) == 2:
-                    for e in assignments:
-                        fixed[e.user_id] += e.user.default_rate
-                        cashbox_perc = cashbox / len(employees)
-                        percent[e.user_id] += round((cashbox_perc * e.user.default_percent) / 100)
+                ratios = {}
+                total_ratio = Decimal("0")
+                for a in assignments:
+                    def_hours = (
+                        datetime.combine(date.today(), a.user.shift_end)
+                        - datetime.combine(date.today(), a.user.shift_start)
+                    ).total_seconds() / 3600 or 1
+                    work_hours = (
+                        datetime.combine(date.today(), a.end_time)
+                        - datetime.combine(date.today(), a.start_time)
+                    ).total_seconds() / 3600
+                    ratio = Decimal(work_hours) / Decimal(def_hours)
+                    ratios[a.user_id] = ratio
+                    total_ratio += ratio
+                    fixed[a.user_id] += Decimal(a.salary)
+                    employee_details.append(
+                        {
+                            "user_id": a.user_id,
+                            "start_time": a.start_time,
+                            "end_time": a.end_time,
+                            "salary": a.salary,
+                        }
+                    )
+
+                for a in assignments:
+                    cashbox_perc = cashbox / len(employee_details)
+                    percent[a.user_id] += round((cashbox_perc * a.user.default_percent) / 100)
             else:
                 for a in assignments:
-                    fixed[a.user_id] += round(a.user.default_rate)
+                    fixed[a.user_id] += Decimal(a.salary)
+                    employee_details.append(
+                        {
+                            "user_id": a.user_id,
+                            "start_time": a.start_time,
+                            "end_time": a.end_time,
+                            "salary": a.salary,
+                        }
+                    )
 
         # Менеджеры/админы по заказам
         for uid, amount in day_orders.items():
@@ -127,7 +155,7 @@ async def get_monthly_report(
             "salary_by_user": salary_by_user,
             "salary_fixed_by_user": salary_fixed_by_user,
             "salary_percent_by_user": salary_percent_by_user,
-            "employees": list(employees),
+            "employees": employee_details,
             "creators": list(day_orders.keys()),
         })
 

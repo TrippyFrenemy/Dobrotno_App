@@ -1,9 +1,9 @@
-from sqlalchemy import Column, Integer, Date, Enum, ForeignKey, text
+from sqlalchemy import Column, Integer, Date, Enum, ForeignKey, text, Time, Numeric
 from sqlalchemy.orm import relationship
 from src.database import Base
 from src.users.models import UserRole
 import enum
-from datetime import datetime
+from datetime import datetime, time
 
 
 class ShiftLocation(str, enum.Enum):
@@ -31,6 +31,10 @@ class ShiftAssignment(Base):
     user_id = Column(ForeignKey("users.id"), nullable=False)
     created_by = Column(ForeignKey("users.id"), nullable=False)
     created_at = Column(Date, default=datetime.now, server_default=text("now()"))
+    
+    start_time = Column(Time, default=time(10, 0))
+    end_time = Column(Time, default=time(20, 0))
+    salary = Column(Numeric(10, 2), default=0.0)
 
     shift = relationship("Shift", backref="assignments")
     user = relationship("User", foreign_keys=[user_id])

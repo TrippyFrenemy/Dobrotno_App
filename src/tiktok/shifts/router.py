@@ -1,3 +1,4 @@
+from decimal import ROUND_HALF_UP, Decimal
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.params import Query
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -5,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy import and_, extract, select, insert
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import List, Optional
 
 from src.database import get_async_session
@@ -46,6 +47,7 @@ async def create_shift_page(
 # 🛠️ Обработка формы создания смены
 @router.post("/create")
 async def create_shift(
+    request: Request,
     date_: date = Form(...),
     location: ShiftLocation = Form(...),
     employees: List[int] = Form(...),
@@ -73,12 +75,30 @@ async def create_shift(
     session.add(shift)
     await session.flush()  # получаем shift.id
 
+    form = await request.form()
+
     # 🧩 Добавляем назначенных сотрудников
     for uid in employees:
+        start_time_str = form.get(f"start_time_{uid}", "10:00")
+        end_time_str = form.get(f"end_time_{uid}", "20:00")
+        start_time_obj = time.fromisoformat(start_time_str)
+        end_time_obj = time.fromisoformat(end_time_str)
+
+        user_obj = await session.get(User, uid)
+        def_hours = (datetime.combine(date.today(), user_obj.shift_end) -
+                     datetime.combine(date.today(), user_obj.shift_start)).total_seconds() / 3600
+        work_hours = (datetime.combine(date.today(), end_time_obj) -
+                      datetime.combine(date.today(), start_time_obj)).total_seconds() / 3600
+        salary = (Decimal(user_obj.default_rate) *
+                  Decimal(work_hours) / Decimal(def_hours)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
         assignment = ShiftAssignment(
             shift_id=shift.id,
             user_id=uid,
-            created_by=current_user.id
+            created_by=current_user.id,
+            start_time=start_time_obj,
+            end_time=end_time_obj,
+            salary=salary
         )
         session.add(assignment)
 
@@ -155,6 +175,7 @@ async def edit_shift_page(
 @router.post("/{shift_id}/edit")
 async def update_shift(
     shift_id: int,
+    request: Request,
     date_: date = Form(...),
     location: ShiftLocation = Form(...),
     employees: List[int] = Form(...),
@@ -175,16 +196,34 @@ async def update_shift(
     shift.date = date_
     shift.location = location
 
+    form = await request.form()
+
     # Удаляем старые назначения
     for assignment in shift.assignments:
         await session.delete(assignment)
 
     # Добавляем новые назначения
     for uid in employees:
+        start_time_str = form.get(f"start_time_{uid}", "10:00")
+        end_time_str = form.get(f"end_time_{uid}", "20:00")
+        start_time_obj = time.fromisoformat(start_time_str)
+        end_time_obj = time.fromisoformat(end_time_str)
+
+        user_obj = await session.get(User, uid)
+        def_hours = (datetime.combine(date.today(), user_obj.shift_end) -
+                     datetime.combine(date.today(), user_obj.shift_start)).total_seconds() / 3600
+        work_hours = (datetime.combine(date.today(), end_time_obj) -
+                      datetime.combine(date.today(), start_time_obj)).total_seconds() / 3600
+        salary = (Decimal(user_obj.default_rate) *
+                  Decimal(work_hours) / Decimal(def_hours)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
         session.add(ShiftAssignment(
             shift_id=shift.id,
             user_id=uid,
-            created_by=current_user.id
+            created_by=current_user.id,
+            start_time=start_time_obj,
+            end_time=end_time_obj,
+            salary=salary
         ))
 
     await session.commit()

@@ -28,7 +28,7 @@
       <th class="p-2 border">Касса</th>
       <th class="p-2 border">Возвраты</th>
       <th class="p-2 border">Итог</th>
-      <th class="p-2 border">Сотрудники</th> 
+      <th class="p-2 border">Сотрудники (часы, грн)</th>
     </tr>
   </thead>
   <tbody>
@@ -40,8 +40,10 @@
       <td class="p-2 border">{{ "%.2f"|format(day.returns) | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.cashbox) | e }}</td>
       <td class="p-2 border">
-        {% for uid in day.employees %}
-          {{ user_map.get(uid, "—") | e }}<br>
+       {% for e in day.employees %}
+          {{ user_map.get(e.user_id, "—") | e }}
+          ({{ e.start_time.strftime("%H:%M") }}–{{ e.end_time.strftime("%H:%M") }},
+          {{ "%.0f"|format(e.salary) }})<br>
         {% endfor %}
       </td>
     </tr>

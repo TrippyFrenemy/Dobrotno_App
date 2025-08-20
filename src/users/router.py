@@ -1,3 +1,4 @@
+from datetime import time
 from typing import Optional
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -34,6 +35,8 @@ async def user_create_form(
     role: str = Form(...),
     default_rate: float = Form(0.0),
     default_percent: float = Form(1.0),
+    shift_start: str = Form("10:00"),
+    shift_end: str = Form("20:00"),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     admin: User = Depends(get_admin_user)
@@ -55,6 +58,8 @@ async def user_create_form(
         role=role,
         default_rate=default_rate,
         default_percent=default_percent,
+        shift_start=time.fromisoformat(shift_start),
+        shift_end=time.fromisoformat(shift_end),
         hashed_password=pwd_context.hash(password),
     )
     session.add(new_user)
@@ -85,6 +90,8 @@ async def update_user(
     role: str = Form(...),
     default_rate: float = Form(0.0),
     default_percent: float = Form(1.0),
+    shift_start: str = Form("10:00"),
+    shift_end: str = Form("20:00"),
     is_active: Optional[bool] = Form(False),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
@@ -102,6 +109,8 @@ async def update_user(
     user.default_rate = default_rate
     user.default_percent = default_percent
     user.is_active = is_active
+    user.shift_start = time.fromisoformat(shift_start)
+    user.shift_end = time.fromisoformat(shift_end)
     await session.commit()
     return RedirectResponse("/users/me", status_code=302)
 

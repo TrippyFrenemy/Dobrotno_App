@@ -18,15 +18,72 @@
     </select>
 
     <label>Сотрудники</label>
-    <select name="employees" multiple required class="border p-2 rounded h-40">
+    <select name="employees" multiple required class="border p-2 rounded h-40" id="employee-select">
       {% for u in users %}
       {% if u.is_active %}
-      <option value="{{ u.id }}">{{ u.name | e }}</option>
+      <option value="{{ u.id }}" data-rate="{{ u.default_rate }}" data-start="{{ u.shift_start.strftime('%H:%M') }}" data-end="{{ u.shift_end.strftime('%H:%M') }}">{{ u.name | e }}</option>
       {% endif %}
       {% endfor %}
     </select>
 
+    <div id="assignments" class="flex flex-col gap-4"></div>
+
     <button class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
   </form>
 </div>
+<script>
+const employeeSelect = document.getElementById('employee-select');
+const assignmentsDiv = document.getElementById('assignments');
+
+function parseTime(t){
+  const [h,m] = t.split(':');
+  return new Date(0,0,0,h,m).getTime();
+}
+
+function updateAssignments(){
+  const selected = Array.from(employeeSelect.selectedOptions);
+  const existingIds = Array.from(assignmentsDiv.children).map(div => div.dataset.userId);
+  // Remove unselected
+  existingIds.forEach(id => {
+    if(!selected.find(opt => opt.value === id)){
+      assignmentsDiv.querySelector(`div[data-user-id="${id}"]`).remove();
+    }
+  });
+  // Add new selections
+  selected.forEach(opt => {
+    const id = opt.value;
+    if(assignmentsDiv.querySelector(`div[data-user-id="${id}"]`)) return;
+    const rate = parseFloat(opt.dataset.rate || 0);
+    const defStart = opt.dataset.start;
+    const defEnd = opt.dataset.end;
+    const container = document.createElement('div');
+    container.className = 'assignment border p-2 rounded';
+    container.dataset.userId = id;
+    container.innerHTML = `
+      <p class="font-semibold">${opt.text}</p>
+      <label>Начало</label>
+      <input type="time" name="start_time_${id}" value="${defStart}" class="border p-1 rounded start">
+      <label>Конец</label>
+      <input type="time" name="end_time_${id}" value="${defEnd}" class="border p-1 rounded end">
+      <label>Ставка (грн)</label>
+      <input type="number" step="1" name="amount_${id}" value="${Math.round(rate)}" class="border p-1 rounded amount" readonly>
+    `;
+    assignmentsDiv.appendChild(container);
+
+    const startInput = container.querySelector('.start');
+    const endInput = container.querySelector('.end');
+    const amountInput = container.querySelector('.amount');
+
+    function recalc(){
+      if(!startInput.value || !endInput.value) return;
+      const workHours = (parseTime(endInput.value) - parseTime(startInput.value)) / 3600000;
+      const defHours = (parseTime(defEnd) - parseTime(defStart)) / 3600000;
+      amountInput.value = Math.round(rate * (workHours/defHours));
+    }
+    startInput.addEventListener('change', recalc);
+    endInput.addEventListener('change', recalc);
+  });
+}
+employeeSelect.addEventListener('change', updateAssignments);
+</script>
 {% endblock %}
