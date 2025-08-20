@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Date, Enum, ForeignKey, Numeric, DateTime, Boolean, text
+from sqlalchemy import Column, Index, Integer, Date, Enum, ForeignKey, Numeric, DateTime, Boolean, text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from src.database import Base, metadata
@@ -13,7 +13,8 @@ class RoleType(str, enum.Enum):
 
 class Payout(Base):
     __tablename__ = "payouts"
-
+    __table_args__ = (Index("ix_payouts_date_user_id", "date", "user_id"),)
+    
     id = Column(Integer, primary_key=True)
     user_id = Column(ForeignKey("users.id"), nullable=False)
     date = Column(Date, nullable=False)  # за какой день

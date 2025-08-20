@@ -1,11 +1,11 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, ForeignKey, DateTime, text
+from sqlalchemy import Column, Index, Integer, String, Date, Numeric, ForeignKey, DateTime, text
 from sqlalchemy.orm import relationship
 from src.database import Base, metadata
 from datetime import datetime
 
 class Order(Base):
     __tablename__ = "orders"
-
+    __table_args__ = (Index("ix_orders_date_created_by", "date", "created_by"),)
     id = Column(Integer, primary_key=True)
     date = Column(Date, nullable=False)
     phone_number = Column(String, nullable=False)

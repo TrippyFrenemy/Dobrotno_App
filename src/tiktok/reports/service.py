@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from collections import defaultdict
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +10,7 @@ from src.tiktok.orders.models import Order
 from src.tiktok.returns.models import Return
 from src.tiktok.shifts.models import Shift, ShiftAssignment, ShiftLocation
 from src.users.models import User, UserRole
-from src.tiktok.payouts.models import Payout
+from src.payouts.models import Payout
 
 
 def get_half_month_periods(month: int, year: int):
@@ -137,25 +137,57 @@ async def get_monthly_report(
 
 
 async def get_payouts_for_period(session: AsyncSession, start: date, end: date, current_user: User):
-    # Загружаем пользователей один раз
-    users_q = await session.execute(select(User.id, User.role))
-    user_roles = {uid: role for uid, role in users_q.all()}
-
-    # Загружаем выплаты
-    q = await session.execute(
+    stmt = (
         select(Payout.user_id, func.sum(Payout.amount))
-        .where(and_(Payout.date >= start, Payout.date <= end))
-        .group_by(Payout.user_id)
+        .join(User, User.id == Payout.user_id)
+        .where(Payout.date >= start, Payout.date <= end)
     )
-    payouts = dict(q.all())
 
-    # Фильтрация: если менеджер — не показываем выплаты администраторам
     if current_user.role == UserRole.MANAGER:
-        payouts = {
-            uid: amount
-            for uid, amount in payouts.items()
-            if user_roles.get(uid) != UserRole.ADMIN
-        }
+        stmt = stmt.where(User.role != UserRole.ADMIN)
 
-    return payouts
+    stmt = stmt.group_by(Payout.user_id)
+    q = await session.execute(stmt)
+    return dict(q.all())
 
+
+def summarize_period(days: list[dict], payouts: dict[int, Decimal]):
+    total_orders = Decimal("0")
+    total_returns = Decimal("0")
+    salary_acc = defaultdict(lambda: {"fixed": Decimal("0"), "percent": Decimal("0")})
+
+    for day in days:
+        total_orders += day["orders"]
+        total_returns += day["returns"]
+
+        for uid, amount in day["salary_fixed_by_user"].items():
+            salary_acc[uid]["fixed"] += amount
+        for uid, amount in day["salary_percent_by_user"].items():
+            salary_acc[uid]["percent"] += amount
+
+    salaries = []
+    for uid, parts in salary_acc.items():
+        fixed = parts["fixed"]
+        percent = parts["percent"]
+        total = fixed + percent
+        paid = payouts.get(uid, Decimal("0"))
+        salaries.append(
+            {
+                "user_id": uid,
+                "fixed": fixed,
+                "percent": percent,
+                "total": total,
+                "paid": paid,
+                "remaining": total - paid,
+            }
+        )
+
+    return {
+        "days": days,
+        "totals": {
+            "orders": total_orders,
+            "returns": total_returns,
+            "cashbox": total_orders - total_returns,
+        },
+        "salaries": salaries,
+    }

@@ -1,11 +1,12 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, ForeignKey, DateTime, text
+from sqlalchemy import Column, Index, Integer, String, Date, Numeric, ForeignKey, DateTime, text
 from sqlalchemy.orm import relationship
 from src.database import Base, metadata
 from datetime import datetime
 
 class Return(Base):
     __tablename__ = "returnings"
-
+    __table_args__ = (Index("ix_returnings_date", "date"),)
+    
     id = Column(Integer, primary_key=True)
     date = Column(Date, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)

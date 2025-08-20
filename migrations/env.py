@@ -15,7 +15,7 @@ from src.users.models import *
 from src.tiktok.orders.models import *
 from src.tiktok.returns.models import *
 from src.tiktok.shifts.models import *
-from src.tiktok.payouts.models import *
+from src.payouts.models import *
 from src.cafe.models import *
 from src.stores.models import *
 from src.logs.models import *

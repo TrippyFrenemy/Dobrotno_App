@@ -18,7 +18,7 @@
 </form>
 
 <!-- Блок отчёта -->
-{% for title, days, period in [("1–15", first_half, first_half_range), ("16–конец", second_half, second_half_range)] %}
+{% for title, data, period in [("1–15", first_half, first_half_range), ("16–конец", second_half, second_half_range)] %}
 <h3 class="text-xl font-semibold mt-8 mb-2">🗓 Период: {{ period[0] | e }} — {{ period[1] | e }} ({{ title | e }})</h3>
 
 <table class="w-full text-sm border">
@@ -33,14 +33,12 @@
   </thead>
   <tbody>
     {% set ns = namespace(total_cash=0.0, total_returns=0.0) %}
-    {% for day in days %}
+    {% for day in data.days %}
     <tr>
       <td class="p-2 border">{{ day.date | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.orders) | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.returns) | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.cashbox) | e }}</td>
-      {% set ns.total_cash = ns.total_cash + (day.orders | float) %}
-      {% set ns.total_returns = ns.total_returns + (day.returns | float) %}
       <td class="p-2 border">
         {% for uid in day.employees %}
           {{ user_map.get(uid, "—") | e }}<br>
@@ -52,9 +50,9 @@
   <tfoot class="bg-gray-100 font-semibold">
     <tr>
       <td class="p-2 border text-right" colspan="1">ИТОГО:</td>
-      <td class="p-2 border">{{ "%.2f"|format(ns.total_cash) }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(ns.total_returns) }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(ns.total_cash - ns.total_returns) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(data.totals.orders) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(data.totals.returns) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(data.totals.cashbox) }}</td>
     </tr>
   </tfoot>
 </table>
@@ -76,44 +74,22 @@
     </tr>
   </thead>
   <tbody>
-    {% set user_totals = dict() %}
-    {% for day in days %}
-      {% for uid, amount in day.salary_by_user.items() %}
-        {% if uid not in user_totals %}
-          {% set _ = user_totals.update({uid: amount}) %}
-        {% else %}
-          {% set _ = user_totals.update({uid: user_totals[uid] + amount}) %}
-        {% endif %}
-      {% endfor %}
-    {% endfor %}
-
-    {% for uid in user_totals.keys() %}
+    {% for s in data.salaries %}
     <tr>
-    <td class="p-2 border">👤 {{ user_map.get(uid, "Неизвестно") | e }}</td>
-
-    {% set ns = namespace(fixed=0, percent=0) %}
-    {% for day in days %}
-        {% set ns.fixed = ns.fixed + day.salary_fixed_by_user.get(uid, 0) %}
-        {% set ns.percent = ns.percent + day.salary_percent_by_user.get(uid, 0) %}
-    {% endfor %}
-
-    <td class="p-2 border">{{ "%.2f"|format(ns.fixed) }}</td>
-    <td class="p-2 border">{{ "%.2f"|format(ns.percent) }}</td>
-    <td class="p-2 border">{{ "%.2f"|format(ns.fixed + ns.percent) }}</td>
-
-    {% set payouts = payouts_1_15 if title == "1–15" else payouts_16_31 %}
-    {% set paid = payouts.get(uid, 0) %}
-    <td class="p-2 border">{{ "%.2f"|format(paid) | e }}</td>
-    <td class="p-2 border">{{ "%.2f"|format(ns.fixed + ns.percent - paid) | e }}</td>
-    <td class="p-2 border">
-        <!-- <form method="post" action="/reports/pay">
-        <input type="hidden" name="user_id" value="{{ uid }}">
-        <input type="hidden" name="date" value="{{ period[0] }}">
-        <input type="number" step="0.01" name="amount" placeholder="0.00" class="border p-1 rounded w-24">
-        <button class="text-green-600 hover:underline">Выплатить</button>
-        </form> -->
-        Услуга на доработке
-    </td>
+      <td class="p-2 border">👤 {{ user_map.get(s.user_id, "Неизвестно") | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(s.fixed) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(s.percent) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(s.total) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(s.paid) }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(s.remaining) }}</td>
+      <td class="p-2 border">
+          <form method="post" action="/reports/pay">
+          <input type="hidden" name="user_id" value="{{ s.user_id }}">
+          <input type="hidden" name="date" value="{{ period[0] }}">
+          <input type="number" step="0.01" name="amount" placeholder="0.00" class="border p-1 rounded w-24">
+          <button class="text-green-600 hover:underline">Выплатить</button>
+          </form>
+      </td>
     </tr>
     {% endfor %}
 
