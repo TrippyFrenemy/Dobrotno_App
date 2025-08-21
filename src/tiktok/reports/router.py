@@ -7,11 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.payouts.models import Payout, RoleType
-from src.tiktok.shifts.models import Shift, ShiftLocation
+from src.tiktok.shifts.models import Shift
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.tiktok.reports.service import get_half_month_periods, get_monthly_report, get_payouts_for_period, summarize_period
 from src.users.models import User
+from src.payouts.models import Location
 
 router = APIRouter()
 templates = Jinja2Templates(directory="src/templates")
@@ -82,7 +83,7 @@ async def make_payout(
     payout = Payout(
         user_id=user_id,
         date=date,
-        location=ShiftLocation.tiktok,
+        location=Location.TikTok,
         role_type=role_type,
         amount=amount,
         paid_at=datetime.utcnow(),

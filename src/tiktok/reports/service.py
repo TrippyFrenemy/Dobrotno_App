@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.tiktok.orders.models import Order
 from src.tiktok.returns.models import Return
-from src.tiktok.shifts.models import Shift, ShiftAssignment, ShiftLocation
+from src.tiktok.shifts.models import Shift, ShiftAssignment
 from src.users.models import User, UserRole
-from src.payouts.models import Payout
+from src.payouts.models import Payout, RoleType, Location
 
 
 def get_half_month_periods(month: int, year: int):
@@ -84,7 +84,7 @@ async def get_monthly_report(
             if not assignments:
                 continue
 
-            if shift.location == ShiftLocation.tiktok:
+            if shift.location == Location.TikTok:
                 ratios = {}
                 total_ratio = Decimal("0")
                 for a in assignments:
@@ -170,8 +170,7 @@ async def get_payouts_for_period(session: AsyncSession, start: date, end: date, 
     stmt = (
         select(Payout.user_id, func.sum(Payout.amount))
         .join(User, User.id == Payout.user_id)
-        .where(Payout.date >= start, Payout.date <= end)
-    )
+        .where(Payout.date >= start, Payout.date <= end, Payout.location == Location.TikTok))
 
     if current_user.role == UserRole.MANAGER:
         stmt = stmt.where(User.role != UserRole.ADMIN)

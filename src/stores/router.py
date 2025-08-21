@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, Form, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from decimal import Decimal, ROUND_HALF_UP
+from collections import defaultdict
 
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
@@ -14,13 +15,12 @@ from src.users.models import User, UserRole
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 from .models import Store, StoreShiftRecord, StoreShiftEmployee
 from src.tiktok.reports.service import get_half_month_periods
+from src.payouts.models import Payout, RoleType, Location
 
 from src.config import MANAGER_EMAIL, MANAGER_ROLE
 
 async def compute_salary(
     session: AsyncSession,
-    cash: Decimal,
-    terminal: Decimal,
     store_ids: List[int],
     warehouse_ids: List[int],
 ) -> Decimal:
@@ -30,13 +30,7 @@ async def compute_salary(
     q = await session.execute(select(User).where(User.id.in_(ids)))
     users = {u.id: u for u in q.scalars().all()}
     total = Decimal("0.00")
-    revenue = cash
-    for uid in store_ids:
-        user = users.get(uid)
-        if not user:
-            continue
-        total += user.default_rate + revenue * user.default_percent / 100
-    for uid in warehouse_ids:
+    for uid in ids:
         user = users.get(uid)
         if not user:
             continue
@@ -53,6 +47,42 @@ async def get_config_manager(session: AsyncSession) -> User | None:
 
 router = APIRouter()
 templates = Jinja2Templates(directory="src/templates")
+
+
+async def get_payouts_for_period(
+    session: AsyncSession, start: date, end: date, current_user: User
+):
+    stmt = (
+        select(Payout.user_id, func.sum(Payout.amount))
+        .join(User, User.id == Payout.user_id)
+        .where(
+            Payout.date >= start,
+            Payout.date <= end,
+            Payout.location == Location.Store,
+        )
+    )
+
+    if current_user.role == UserRole.MANAGER:
+        stmt = stmt.where(User.role != UserRole.ADMIN)
+
+    stmt = stmt.group_by(Payout.user_id)
+    q = await session.execute(stmt)
+    return {uid: amt or Decimal("0") for uid, amt in q.all()}
+
+
+def summarize_salaries(salary_acc: dict[int, Decimal], payouts: dict[int, Decimal]):
+    salaries = []
+    for uid, amount in salary_acc.items():
+        paid = payouts.get(uid, Decimal("0"))
+        salaries.append(
+            {
+                "user_id": uid,
+                "total": amount.quantize(Decimal("0.01")),
+                "paid": paid.quantize(Decimal("0.01")),
+                "remaining": (amount - paid).quantize(Decimal("0.01")),
+            }
+        )
+    return salaries
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -129,59 +159,90 @@ async def store_records(
     records_by_date = {r.date: r for r in records}
 
     def build_range(start: date, end: date):
-        data = []
+        days = []
+        totals = {
+            "z": Decimal("0.00"),
+            "terminal": Decimal("0.00"),
+            "cash_processed": Decimal("0.00"),
+            "cash_on_hand": Decimal("0.00"),
+        }
+        salary_acc: dict[int, Decimal] = defaultdict(Decimal)
         current = start
         while current <= end:
             r = records_by_date.get(current)
             if r:
+                z = r.cash or Decimal("0.00")
+                terminal = r.terminal or Decimal("0.00")
+                cash_processed = z - terminal
+                cash_on_hand = r.cash_on_hand or Decimal("0.00")
                 store_emps = [e for e in r.employees if not e.is_warehouse]
                 wh_emps = [e for e in r.employees if e.is_warehouse]
-                revenue = r.cash
-                fixed: dict[int, Decimal] = {}
-                percent: dict[int, Decimal] = {}
-                for e in store_emps:
-                    fixed[e.user_id] = fixed.get(e.user_id, Decimal("0.00")) + e.user.default_rate
-                    percent[e.user_id] = percent.get(e.user_id, Decimal("0.00")) + revenue * e.user.default_percent / 100
-                for e in wh_emps:
-                    fixed[e.user_id] = fixed.get(e.user_id, Decimal("0.00")) + e.user.default_rate
-                salary_by_user = {
-                    uid: (fixed.get(uid, Decimal("0.00")) + percent.get(uid, Decimal("0.00"))).quantize(Decimal("0.01"))
-                    for uid in set(fixed) | set(percent)
-                }
-                data.append(
+                for e in store_emps + wh_emps:
+                    salary_acc[e.user_id] = salary_acc.get(e.user_id, Decimal("0.00")) + e.user.default_rate
+                days.append(
                     {
                         "id": r.id,
                         "date": r.date,
-                        "cash": r.cash,
-                        "terminal": r.terminal,
-                        "cash_on_hand": r.cash_on_hand,
+                        "cash": z,
+                        "terminal": terminal,
+                        "cash_processed": cash_processed,
+                        "cash_on_hand": cash_on_hand,
+                        "changed_price": r.changed_price,
+                        "discount": r.discount,
+                        "promotion": r.promotion,
+                        "to_store": r.to_store,
+                        "refund": r.refund,
+                        "service": r.service,
+                        "receipt": r.receipt,
                         "employees": [
-                            {"id": e.user_id, "is_warehouse": e.is_warehouse} for e in r.employees  if e.user_id != manager_id
+                            {"id": e.user_id, "is_warehouse": e.is_warehouse}
+                            for e in r.employees
+                            if e.user_id != manager_id
                         ],
-                        "salary_by_user": salary_by_user,
-                        "salary_fixed_by_user": {uid: fixed[uid].quantize(Decimal("0.01")) for uid in fixed},
-                        "salary_percent_by_user": {uid: percent[uid].quantize(Decimal("0.01")) for uid in percent},
                     }
                 )
+                totals["z"] += z
+                totals["terminal"] += terminal
+                totals["cash_processed"] += cash_processed
+                totals["cash_on_hand"] += cash_on_hand
             else:
-                data.append(
+                days.append(
                     {
                         "id": None,
                         "date": current,
                         "cash": Decimal("0.00"),
                         "terminal": Decimal("0.00"),
+                        "cash_processed": Decimal("0.00"),
                         "cash_on_hand": Decimal("0.00"),
+                        "changed_price": Decimal("0.00"),
+                        "discount": Decimal("0.00"),
+                        "promotion": Decimal("0.00"),
+                        "to_store": Decimal("0.00"),
+                        "refund": Decimal("0.00"),
+                        "service": Decimal("0.00"),
+                        "receipt": Decimal("0.00"),
                         "employees": [],
-                        "salary_by_user": {},
-                        "salary_fixed_by_user": {},
-                        "salary_percent_by_user": {},
                     }
                 )
             current += timedelta(days=1)
-        return data
+        return days, totals, salary_acc
 
-    data_first = build_range(first_range[0], first_range[1])
-    data_second = build_range(second_range[0], second_range[1])
+    days_first, totals_first, salary_acc_first = build_range(first_range[0], first_range[1])
+    days_second, totals_second, salary_acc_second = build_range(second_range[0], second_range[1])
+
+    payouts_first = await get_payouts_for_period(session, first_range[0], first_range[1], user)
+    payouts_second = await get_payouts_for_period(session, second_range[0], second_range[1], user)
+
+    first_half = {
+        "days": days_first,
+        "totals": totals_first,
+        "salaries": summarize_salaries(salary_acc_first, payouts_first),
+    }
+    second_half = {
+        "days": days_second,
+        "totals": totals_second,
+        "salaries": summarize_salaries(salary_acc_second, payouts_second),
+    }   
 
     users_q = await session.execute(select(User))
     user_map = {u.id: u.name for u in users_q.scalars().all()}
@@ -195,14 +256,46 @@ async def store_records(
             "store_name": store.name,
             "month": month,
             "year": year,
-            "first_half": data_first,
-            "second_half": data_second,
+            "first_half": first_half,
+            "second_half": second_half,
             "user_map": user_map,
             "csrf_token": csrf_token,
             "first_half_range": first_range,
             "second_half_range": second_range,
             "user": user,
         },
+    )
+
+
+@router.post("/{store_id}/pay")
+async def make_payout(
+    store_id: int,
+    user_id: int = Form(...),
+    date: date = Form(...),
+    amount: Decimal = Form(...),
+    csrf_token: str = Form(...),
+    session: AsyncSession = Depends(get_async_session),
+    payer_user: User = Depends(get_manager_or_admin),
+):
+    if not csrf_token or not await verify_csrf_token(payer_user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    role_type = RoleType(user.role.value)
+    payout = Payout(
+        user_id=user_id,
+        date=date,
+        location=Location.Store,
+        role_type=role_type,
+        amount=amount,
+        paid_at=datetime.utcnow(),
+        is_manual=True,
+    )
+    session.add(payout)
+    await session.commit()
+    return RedirectResponse(
+        f"/stores/{store_id}/records?month={date.month}&year={date.year}", status_code=302
     )
 
 
@@ -238,6 +331,23 @@ async def create_record(
     cash: Decimal = Form(...),
     cash_on_hand: Decimal = Form(...),
     terminal: Decimal = Form(...),
+    changed_price: Decimal = Form(0),
+    discount: Decimal = Form(0),
+    promotion: Decimal = Form(0),
+    to_store: Decimal = Form(0),
+    refund: Decimal = Form(0),
+    service: Decimal = Form(0),
+    receipt: Decimal = Form(0),
+    cash_comment: str = Form(""),
+    cash_on_hand_comment: str = Form(""),
+    terminal_comment: str = Form(""),
+    changed_price_comment: str = Form(""),
+    discount_comment: str = Form(""),
+    promotion_comment: str = Form(""),
+    to_store_comment: str = Form(""),
+    refund_comment: str = Form(""),
+    service_comment: str = Form(""),
+    receipt_comment: str = Form(""),
     store_employees: List[str] = Form([]),
     warehouse_employees: List[str] = Form([]),
     csrf_token: str = Form(...),
@@ -255,17 +365,46 @@ async def create_record(
     if manager_user and manager_user.id not in store_employees:
         store_employees.append(manager_user.id)
 
-    salary_expenses = await compute_salary(
-        session, cash, terminal, store_employees, warehouse_employees
-    )
+    salary_expenses = await compute_salary(session, store_employees, warehouse_employees)
+
+    comments: dict[str, str] = {}
+    if cash_comment:
+        comments["cash"] = cash_comment
+    if cash_on_hand_comment:
+        comments["cash_on_hand"] = cash_on_hand_comment
+    if terminal_comment:
+        comments["terminal"] = terminal_comment
+    if changed_price_comment:
+        comments["changed_price"] = changed_price_comment
+    if discount_comment:
+        comments["discount"] = discount_comment
+    if promotion_comment:
+        comments["promotion"] = promotion_comment
+    if to_store_comment:
+        comments["to_store"] = to_store_comment
+    if refund_comment:
+        comments["refund"] = refund_comment
+    if service_comment:
+        comments["service"] = service_comment
+    if receipt_comment:
+        comments["receipt"] = receipt_comment
     record = StoreShiftRecord(
         store_id=store_id,
         date=date_,
         cash=cash,
         cash_on_hand=cash_on_hand,
         terminal=terminal,
+        changed_price=changed_price,
+        discount=discount,
+        promotion=promotion,
+        to_store=to_store,
+        refund=refund,
+        service=service,
+        receipt=receipt,
         salary_expenses=salary_expenses,
+        comments=comments,
     )
+
     session.add(record)
     await session.flush()
     for uid in store_employees:
@@ -350,6 +489,23 @@ async def edit_record(
     cash: Decimal = Form(...),
     cash_on_hand: Decimal = Form(...),
     terminal: Decimal = Form(...),
+    changed_price: Decimal = Form(0),
+    discount: Decimal = Form(0),
+    promotion: Decimal = Form(0),
+    to_store: Decimal = Form(0),
+    refund: Decimal = Form(0),
+    service: Decimal = Form(0),
+    receipt: Decimal = Form(0),
+    cash_comment: str = Form(""),
+    cash_on_hand_comment: str = Form(""),
+    terminal_comment: str = Form(""),
+    changed_price_comment: str = Form(""),
+    discount_comment: str = Form(""),
+    promotion_comment: str = Form(""),
+    to_store_comment: str = Form(""),
+    refund_comment: str = Form(""),
+    service_comment: str = Form(""),
+    receipt_comment: str = Form(""),
     store_employees: List[str] = Form([]),
     warehouse_employees: List[str] = Form([]),
     csrf_token: str = Form(...),
@@ -367,6 +523,32 @@ async def edit_record(
     record.cash = cash
     record.terminal = terminal
     record.cash_on_hand = cash_on_hand
+    record.changed_price = changed_price
+    record.discount = discount
+    record.promotion = promotion
+    record.to_store = to_store
+    record.refund = refund
+    record.service = service
+    record.receipt = receipt
+
+    comments = dict(record.comments or {})
+    def set_comment(field: str, value: str):
+        if value:
+            comments[field] = value
+        else:
+            comments.pop(field, None)
+
+    set_comment("cash", cash_comment)
+    set_comment("cash_on_hand", cash_on_hand_comment)
+    set_comment("terminal", terminal_comment)
+    set_comment("changed_price", changed_price_comment)
+    set_comment("discount", discount_comment)
+    set_comment("promotion", promotion_comment)
+    set_comment("to_store", to_store_comment)
+    set_comment("refund", refund_comment)
+    set_comment("service", service_comment)
+    set_comment("receipt", receipt_comment)
+    record.comments = comments
 
     store_employees = [int(uid) for uid in store_employees if uid.strip().isdigit()]
     warehouse_employees = [int(uid) for uid in warehouse_employees if uid.strip().isdigit()]
@@ -374,9 +556,7 @@ async def edit_record(
     if manager_user and manager_user.id not in store_employees:
         store_employees.append(manager_user.id)
 
-    salary_expenses = await compute_salary(
-        session, cash, terminal, store_employees, warehouse_employees
-    )
+    salary_expenses = await compute_salary(session, store_employees, warehouse_employees)
     record.salary_expenses = salary_expenses
     await session.execute(
         StoreShiftEmployee.__table__.delete().where(StoreShiftEmployee.shift_id == record_id)

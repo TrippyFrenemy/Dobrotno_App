@@ -20,7 +20,7 @@
     <input type="number" name="default_rate" step="1" value="{{ user.default_rate }}" class="border p-2 rounded" placeholder="Ставка (грн)"/>
     <input type="number" name="default_percent" step="1" value="{{ user.default_percent }}" class="border p-2 rounded" placeholder="Ставка (%)"/>
     <label>Начало смены</label>
-    <input type="time" name="shift_start" value="{{ user.shift_start.strftime('%H:%M') if user.shift_start else '10:00' }}" class="border p-2 rounded" />
+    <input type="time" name="shift_start" value="{{ user.shift_start.strftime('%H:%M') if user.shift_start else '09:00' }}" class="border p-2 rounded" />
     <label>Конец смены</label>
     <input type="time" name="shift_end" value="{{ user.shift_end.strftime('%H:%M') if user.shift_end else '20:00' }}" class="border p-2 rounded" />
     <label class="flex items-center gap-2">

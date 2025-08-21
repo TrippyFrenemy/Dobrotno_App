@@ -9,6 +9,13 @@ class RoleType(str, enum.Enum):
     EMPLOYEE = "employee"
     MANAGER = "manager"
     ADMIN = "admin"
+    STORE_WORKER = "store_worker"
+    WAREHOUSE_WORKER = "warehouse_worker"
+
+class Location(str, enum.Enum):
+    TikTok = "TikTok"
+    Store = "Store"
+    Other  = "Other"
 
 
 class Payout(Base):
@@ -18,7 +25,7 @@ class Payout(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(ForeignKey("users.id"), nullable=False)
     date = Column(Date, nullable=False)  # за какой день
-    location = Column(Enum("TikTok", "Store", "Other", name="location_enum"), nullable=False)
+    location = Column(Enum(Location, name="location_enum"), nullable=False)
     role_type = Column(Enum(RoleType), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     paid_at = Column(DateTime, default=datetime.now)

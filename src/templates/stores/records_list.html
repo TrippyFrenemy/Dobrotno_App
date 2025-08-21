@@ -17,7 +17,7 @@
   <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
 </form>
 
-{% for title, days, period in [
+{% for title, data, period in [
   ("1–15", first_half, first_half_range),
   ("16–конец", second_half, second_half_range)
 ] %}
@@ -36,89 +36,74 @@
       </tr>
     </thead>
     <tbody>
-      {% set ns = namespace(total_cash_proc=0.0, total_cash_on_hand=0.0, total_terminal=0.0, total_z=0.0) %}
-      {% for rec in days %}
-        {% set z = (rec.cash | float) %}
-        {% set terminal = (rec.terminal | float) %}
-        {% set cash_processed = z - terminal %}
-        {% set cash_on_hand = (rec.cash_on_hand | float) if rec.cash_on_hand is defined else 0.0 %}
-
+      {% for rec in data.days %}
       <tr>
         <td class="p-2 border whitespace-nowrap">{{ rec.date }}</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(z) }}</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(terminal) }}</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(cash_processed) }}</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(cash_on_hand) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(rec.terminal) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash_processed) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash_on_hand) }}</td>
         <td class="p-2 border">
           {% for e in rec.employees %}
             {{ user_map.get(e.id, '—') }}{% if e.is_warehouse %} (склад){% endif %}<br>
           {% endfor %}
         </td>
-          <td class="p-2 border">
-            {% if rec.id %}
-            <div class="flex justify-center gap-2">
-              <a href="/stores/{{ store_id }}/records/{{ rec.id }}/edit" class="text-blue-600 hover:underline">✏️</a>
-              {% if user.role == 'admin' %}
-              <form method="post" action="/stores/{{ store_id }}/records/{{ rec.id }}/delete" onsubmit="return confirm('Удалить смену?')">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button type="submit" class="text-red-600 hover:underline">🗑️</button>
-              </form>
-              {% endif %}
-            </div>
+        <td class="p-2 border">
+          {% if rec.id %}
+          <div class="flex justify-center gap-2">
+            <a href="/stores/{{ store_id }}/records/{{ rec.id }}/edit" class="text-blue-600 hover:underline">✏️</a>
+            {% if user.role == 'admin' %}
+            <form method="post" action="/stores/{{ store_id }}/records/{{ rec.id }}/delete" onsubmit="return confirm('Удалить смену?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="text-red-600 hover:underline">🗑️</button>
+            </form>
             {% endif %}
-          </td>
+          </div>
+          {% endif %}
+        </td>
       </tr>
-        {% set ns.total_z = ns.total_z + z %}
-        {% set ns.total_terminal = ns.total_terminal + terminal %}
-        {% set ns.total_cash_proc = ns.total_cash_proc + cash_processed %}
-        {% set ns.total_cash_on_hand = ns.total_cash_on_hand + cash_on_hand %}
       {% endfor %}
     </tbody>
     <tfoot>
       <tr class="bg-gray-50 font-semibold">
         <td class="p-2 border text-right">ИТОГО:</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_z) }}</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_terminal) }}</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_cash_proc) }}</td>
-        <td class="p-2 border text-right">{{ '%.2f'|format(ns.total_cash_on_hand) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.z) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.terminal) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.cash_processed) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.cash_on_hand) }}</td>
         <td class="p-2 border"></td>
         <td class="p-2 border"></td>
       </tr>
     </tfoot>
   </table>
 
-  <h4 class="text-lg font-semibold mt-4">👥 Зарплаты по сотрудникам (ставка + %)</h4>
+  <h4 class="text-lg font-semibold mt-4">👥 Зарплаты по сотрудникам</h4>
   <table class="w-full text-sm border mb-8">
     <thead class="bg-gray-50">
       <tr>
         <th class="p-2 border">Сотрудник</th>
         <th class="p-2 border">По ставке</th>
-        <th class="p-2 border">Процент</th>
-        <!-- <th class="p-2 border">Итого</th> -->
+        <th class="p-2 border">Выплачено</th>
+        <th class="p-2 border">Остаток</th>
+        <th class="p-2 border">Действия</th>
       </tr>
     </thead>
     <tbody>
-      {% set user_totals = dict() %}
-      {% for day in days %}
-        {% for uid, amount in day.salary_by_user.items() %}
-          {% if uid not in user_totals %}
-            {% set _ = user_totals.update({uid: amount}) %}
-          {% else %}
-            {% set _ = user_totals.update({uid: user_totals[uid] + amount}) %}
-          {% endif %}
-        {% endfor %}
-      {% endfor %}
-
-      {% for uid in user_totals.keys() %}
+      {% for s in data.salaries %}
       <tr>
-        <td class="p-2 border">👤 {{ user_map.get(uid, '—') }}</td>
-        {% set ns = namespace(fixed=0, percent=0) %}
-        {% for day in days %}
-          {% set ns.fixed = ns.fixed + day.salary_fixed_by_user.get(uid, 0) %}
-          {% set ns.percent = ns.percent + day.salary_percent_by_user.get(uid, 0) %}
-        {% endfor %}
-        <td class="p-2 border">{{ '%.2f'|format(ns.fixed) }}</td>
-        <td class="p-2 border">{{ '%.2f'|format(ns.percent) }}</td>
+        <td class="p-2 border">👤 {{ user_map.get(s.user_id, '—') }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(s.total) }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(s.paid) }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(s.remaining) }}</td>
+        <td class="p-2 border">
+          <form method="post" action="/stores/{{ store_id }}/pay">
+            <input type="hidden" name="user_id" value="{{ s.user_id }}">
+            <input type="hidden" name="date" value="{{ period[0] }}">
+            <input type="number" step="0.01" name="amount" placeholder="0.00" class="border p-1 rounded w-24">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="text-green-600 hover:underline">Выплатить</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
