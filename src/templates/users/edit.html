@@ -13,6 +13,7 @@
       <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Администратор (Не ставить не Аврущенко)</option>
       <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Менеджер</option>
       <option value="coffee" {% if user.role == 'coffee' %}selected{% endif %}>Бариста</option>
+      <option value="cashier" {% if user.role == 'cashier' %}selected{% endif %}>Кассир</option>
       <option value="employee" {% if user.role == 'employee' %}selected{% endif %}>Сотрудник</option>
       <option value="store_worker" {% if user.role == 'store_worker' %}selected{% endif %}>Сотрудник Магазина</option>
       <option value="warehouse_worker" {% if user.role == 'warehouse_worker' %}selected{% endif %}>Сотрудник Склада</option>

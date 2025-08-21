@@ -27,43 +27,54 @@
     <thead class="bg-gray-100">
       <tr>
         <th class="p-2 border text-left">Дата</th>
+        {% if user.role in ['manager', 'admin'] %}
         <th class="p-2 border text-right">Итоговая касса (Z)</th>
         <th class="p-2 border text-right">Терминал</th>
         <th class="p-2 border text-right">Наличные по кассе</th>
         <th class="p-2 border text-right">Наличные в кассе (конец)</th>
+        {% endif %}
         <th class="p-2 border text-left">Сотрудники</th>
+        {% if user.role in ['manager', 'admin'] %}
         <th class="p-2 border text-center">Правка</th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
       {% for rec in data.days %}
       <tr>
         <td class="p-2 border whitespace-nowrap">{{ rec.date }}</td>
+        {% if user.role in ['manager', 'admin'] %}
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.terminal) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash_processed) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash_on_hand) }}</td>
+        {% endif %}
         <td class="p-2 border">
           {% for e in rec.employees %}
             {{ user_map.get(e.id, '—') }}{% if e.is_warehouse %} (склад){% endif %}<br>
           {% endfor %}
         </td>
+        {% if user.role in ['manager', 'admin'] %}
         <td class="p-2 border">
           {% if rec.id %}
           <div class="flex justify-center gap-2">
-            <a href="/stores/{{ store_id }}/records/{{ rec.id }}/edit" class="text-blue-600 hover:underline">✏️</a>
+            <a href="/stores/{{ store_id }}/records/{{ rec.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
             {% if user.role == 'admin' %}
             <form method="post" action="/stores/{{ store_id }}/records/{{ rec.id }}/delete" onsubmit="return confirm('Удалить смену?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button type="submit" class="text-red-600 hover:underline">🗑️</button>
+              <button type="submit" class="text-red-600 hover:underline">Удалить</button>
             </form>
             {% endif %}
           </div>
+          {% else %}
+              —
           {% endif %}
         </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
+    {% if user.role in ['manager', 'admin'] %}
     <tfoot>
       <tr class="bg-gray-50 font-semibold">
         <td class="p-2 border text-right">ИТОГО:</td>
@@ -75,8 +86,9 @@
         <td class="p-2 border"></td>
       </tr>
     </tfoot>
+    {% endif %}
   </table>
-
+  {% if user.role in ['manager', 'admin'] %}
   <h4 class="text-lg font-semibold mt-4">👥 Зарплаты по сотрудникам</h4>
   <table class="w-full text-sm border mb-8">
     <thead class="bg-gray-50">
@@ -108,5 +120,6 @@
       {% endfor %}
     </tbody>
   </table>
+  {% endif %}
 {% endfor %}
 {% endblock %}

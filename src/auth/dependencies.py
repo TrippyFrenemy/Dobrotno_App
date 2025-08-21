@@ -46,3 +46,8 @@ async def get_manager_or_admin(current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Managers or admins only")
     return current_user
+
+async def get_cashier_or_manager_or_admin(current_user: User = Depends(get_current_user)):
+    if current_user.role not in ["admin", "manager", "cashier"]:
+        raise HTTPException(status_code=403, detail="Cashiers, managers or admins only")
+    return current_user

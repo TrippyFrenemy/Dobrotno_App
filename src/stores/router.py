@@ -10,7 +10,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
 
 from src.database import get_async_session
-from src.auth.dependencies import get_admin_user, get_manager_or_admin
+from src.auth.dependencies import get_admin_user, get_cashier_or_manager_or_admin, get_manager_or_admin
 from src.users.models import User, UserRole
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 from .models import Store, StoreShiftRecord, StoreShiftEmployee
@@ -103,7 +103,7 @@ def summarize_salaries(salary_acc: dict[int, Decimal], payouts: dict[int, Decima
 async def list_stores(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_manager_or_admin),
+    user: User = Depends(get_cashier_or_manager_or_admin),
 ):
     result = await session.execute(select(Store))
     stores = result.scalars().all()
@@ -140,7 +140,7 @@ async def store_records(
     month: int = Query(None, ge=1, le=12),
     year: int = Query(None),
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_manager_or_admin),
+    user: User = Depends(get_cashier_or_manager_or_admin),
 ):
     store = await session.get(Store, store_id)
     if not store:
@@ -318,7 +318,7 @@ async def create_record_page(
     store_id: int,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_manager_or_admin),
+    user: User = Depends(get_cashier_or_manager_or_admin),
 ):
     csrf_token = await generate_csrf_token(user.id)
     store_q = await session.execute(select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True))
@@ -367,7 +367,7 @@ async def create_record(
     warehouse_employees: List[str] = Form([]),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_manager_or_admin),
+    user: User = Depends(get_cashier_or_manager_or_admin),
 ):
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")

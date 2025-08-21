@@ -96,6 +96,8 @@ function updateAssignments(select, assignmentsDiv){
   });
   selected.forEach(opt => {
     const id = opt.value;
+    if (!id) return; // 👈 пропускаем "---"
+
     if(assignmentsDiv.querySelector(`div[data-user-id="${id}"]`)) return;
     const rate = parseFloat(opt.dataset.rate || 0);
     const defStart = opt.dataset.start;
@@ -113,6 +115,7 @@ function updateAssignments(select, assignmentsDiv){
       <input type="number" step="1" class="border p-1 rounded amount" value="${Math.round(rate)}" readonly>
     `;
     assignmentsDiv.appendChild(container);
+
     const startInput = container.querySelector('.start');
     const endInput = container.querySelector('.end');
     const amountInput = container.querySelector('.amount');
