@@ -6,7 +6,9 @@
   <h2 class="text-xl font-semibold mb-4">Редактировать смену</h2>
   <form method="post" class="flex flex-col gap-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
+    {% if return_url %}
+      <input type="hidden" name="return_url" value="{{ return_url }}">
+    {% endif %}
     <label>Дата</label>
     <input type="date" name="date_" value="{{ shift.date }}" required class="border p-2 rounded" readonly>
 

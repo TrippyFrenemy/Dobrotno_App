@@ -28,7 +28,8 @@
       <th class="p-2 border">Касса</th>
       <th class="p-2 border">Возвраты</th>
       <th class="p-2 border">Итог</th>
-      <th class="p-2 border">Сотрудники (часы, грн)</th>
+      <th class="p-2 border">Сотрудники</th>
+      <th class="p-2 border">Действия</th>
     </tr>
   </thead>
   <tbody>
@@ -40,21 +41,34 @@
       <td class="p-2 border">{{ "%.2f"|format(day.returns) | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.cashbox) | e }}</td>
       <td class="p-2 border">
-       {% for e in day.employees %}
-          {{ user_map.get(e.user_id, "—") | e }}
-          ({{ e.start_time.strftime("%H:%M") }}–{{ e.end_time.strftime("%H:%M") }},
-          {{ "%.0f"|format(e.salary) }})<br>
+        <ul class="list-disc list-inside">
+        {% for e in day.employees %}
+          <li>
+            <span class="font-medium">{{ user_map.get(e.user_id, "—") | e }}</span>
+            <span class="text-gray-500 text-xs">({{ e.start_time.strftime("%H:%M") }}–{{ e.end_time.strftime("%H:%M") }})</span>
+            <span class="ml-1">{{ "%.0f"|format(e.salary) }}</span>
+          </li>
         {% endfor %}
+        </ul>
+      </td>
+      <td class="p-2 border text-center">
+        {% if day.shift_id and day.employees %}
+          {% set ret = '/reports/monthly?month=' ~ month ~ '&year=' ~ year %}
+          <a href="/shifts/{{ day.shift_id }}/edit?return_url={{ ret | urlencode }}" class="text-blue-600 hover:underline">Изменить</a>
+        {% else %}
+          —
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
   </tbody>
   <tfoot class="bg-gray-100 font-semibold">
     <tr>
-      <td class="p-2 border text-right" colspan="1">ИТОГО:</td>
+      <td class="p-2 border text-right">ИТОГО:</td>
       <td class="p-2 border">{{ "%.2f"|format(data.totals.orders) }}</td>
       <td class="p-2 border">{{ "%.2f"|format(data.totals.returns) }}</td>
       <td class="p-2 border">{{ "%.2f"|format(data.totals.cashbox) }}</td>
+      <td class="p-2 border" colspan="2"></td>
     </tr>
   </tfoot>
 </table>

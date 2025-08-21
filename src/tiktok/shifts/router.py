@@ -145,7 +145,8 @@ async def edit_shift_page(
     shift_id: int,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(get_manager_or_admin)
+    user: User = Depends(get_manager_or_admin),
+    return_url: str | None = Query(None),
 ):
     csrf_token = await generate_csrf_token(user.id)
 
@@ -169,6 +170,7 @@ async def edit_shift_page(
         "assigned_ids": assigned_ids,
         "locations": list(ShiftLocation),
         "csrf_token": csrf_token,
+        "return_url": return_url,
     })
 
 
@@ -180,6 +182,7 @@ async def update_shift(
     location: ShiftLocation = Form(...),
     employees: List[int] = Form(...),
     csrf_token: str = Form(...),
+    return_url: str | None = Form(None),
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_manager_or_admin)
 ):
@@ -227,7 +230,8 @@ async def update_shift(
         ))
 
     await session.commit()
-    return RedirectResponse("/shifts/list", status_code=302)
+    redirect_to = return_url or "/shifts/list"
+    return RedirectResponse(redirect_to, status_code=302)
 
 @router.post("/{shift_id}/delete", response_class=RedirectResponse)
 async def delete_shift(

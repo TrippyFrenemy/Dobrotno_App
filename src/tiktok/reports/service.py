@@ -75,6 +75,7 @@ async def get_monthly_report(
         fixed = defaultdict(Decimal)
         percent = defaultdict(Decimal)
         employee_details = []
+        shift_id = shifts[0].id if shifts else None
 
         # Сотрудники по сменам
         for shift in shifts:
@@ -157,6 +158,7 @@ async def get_monthly_report(
             "salary_percent_by_user": salary_percent_by_user,
             "employees": employee_details,
             "creators": list(day_orders.keys()),
+            "shift_id": shift_id,
         })
 
         current += timedelta(days=1)
