@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, time
 from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
 
@@ -20,21 +20,35 @@ from src.payouts.models import Payout, RoleType, Location
 from src.config import MANAGER_EMAIL, MANAGER_ROLE
 
 async def compute_salary(
-    session: AsyncSession,
-    store_ids: List[int],
-    warehouse_ids: List[int],
+    session: AsyncSession, assignments: List[tuple[int, str | None, str | None]]
 ) -> Decimal:
-    ids = list(set(store_ids + warehouse_ids))
-    if not ids:
+    """Calculate total salary based on user default rate and worked hours."""
+    if not assignments:
         return Decimal("0.00")
+    ids = [uid for uid, _, _ in assignments]
     q = await session.execute(select(User).where(User.id.in_(ids)))
     users = {u.id: u for u in q.scalars().all()}
+
+    def _to_time(value: str | None, fallback: time) -> time:
+        return time.fromisoformat(value) if value else fallback
+
     total = Decimal("0.00")
-    for uid in ids:
+    for uid, start_s, end_s in assignments:
         user = users.get(uid)
         if not user:
             continue
-        total += user.default_rate
+        start_t = _to_time(start_s, user.shift_start)
+        end_t = _to_time(end_s, user.shift_end)
+        def_hours = (
+            datetime.combine(date.today(), user.shift_end)
+            - datetime.combine(date.today(), user.shift_start)
+        ).total_seconds() / 3600 or 1
+        work_hours = (
+            datetime.combine(date.today(), end_t)
+            - datetime.combine(date.today(), start_t)
+        ).total_seconds() / 3600
+        coeff = Decimal(work_hours) / Decimal(def_hours)
+        total += user.default_rate * coeff
     return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 async def get_config_manager(session: AsyncSession) -> User | None:
@@ -327,6 +341,7 @@ async def create_record_page(
 @router.post("/{store_id}/records/create")
 async def create_record(
     store_id: int,
+    request: Request,
     date_: date = Form(...),
     cash: Decimal = Form(...),
     cash_on_hand: Decimal = Form(...),
@@ -358,14 +373,29 @@ async def create_record(
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
     # if not store_employees:
     #     raise HTTPException(status_code=400, detail="Select at least one store employee")
-    
+    stmt = select(StoreShiftRecord).where(StoreShiftRecord.date == date_, StoreShiftRecord.store_id == store_id)
+    result = await session.execute(stmt)
+    if result.scalar():
+        raise HTTPException(status_code=400, detail="Смена на эту дату и локацию уже существует")
+
     store_employees = [int(uid) for uid in store_employees if uid.strip().isdigit()]
     warehouse_employees = [int(uid) for uid in warehouse_employees if uid.strip().isdigit()]
     manager_user = await get_config_manager(session)
     if manager_user and manager_user.id not in store_employees:
         store_employees.append(manager_user.id)
+    
+    form = await request.form()
+    assignments = []
+    for uid in store_employees + warehouse_employees:
+        assignments.append(
+            (
+                uid,
+                form.get(f"start_time_{uid}"),
+                form.get(f"end_time_{uid}"),
+            )
+        )
 
-    salary_expenses = await compute_salary(session, store_employees, warehouse_employees)
+    salary_expenses = await compute_salary(session, assignments)
 
     comments: dict[str, str] = {}
     if cash_comment:
@@ -452,7 +482,7 @@ async def edit_record_page(
         options=[selectinload(StoreShiftRecord.employees).selectinload(StoreShiftEmployee.user)],
     )
     if not record or record.store_id != store_id:
-        raise HTTPException(status_code=404, detail="Record not found")
+        raise HTTPException(status_code=404, detail="Смена не найдена")
     csrf_token = await generate_csrf_token(user.id)
     
     store_q = await session.execute(select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True))
@@ -485,6 +515,7 @@ async def edit_record_page(
 async def edit_record(
     store_id: int,
     record_id: int,
+    request: Request,
     date_: date = Form(...),
     cash: Decimal = Form(...),
     cash_on_hand: Decimal = Form(...),
@@ -516,7 +547,7 @@ async def edit_record(
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
     record = await session.get(StoreShiftRecord, record_id)
     if not record or record.store_id != store_id:
-        raise HTTPException(status_code=404, detail="Record not found")
+        raise HTTPException(status_code=404, detail="Смена не найдена")
     # if not store_employees:
     #     raise HTTPException(status_code=400, detail="Select at least one store employee")
     record.date = date_
@@ -556,7 +587,17 @@ async def edit_record(
     if manager_user and manager_user.id not in store_employees:
         store_employees.append(manager_user.id)
 
-    salary_expenses = await compute_salary(session, store_employees, warehouse_employees)
+    form = await request.form()
+    assignments = []
+    for uid in store_employees + warehouse_employees:
+        assignments.append(
+            (
+                uid,
+                form.get(f"start_time_{uid}"),
+                form.get(f"end_time_{uid}"),
+            )
+        )
+    salary_expenses = await compute_salary(session, assignments)
     record.salary_expenses = salary_expenses
     await session.execute(
         StoreShiftEmployee.__table__.delete().where(StoreShiftEmployee.shift_id == record_id)

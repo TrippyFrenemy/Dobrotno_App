@@ -6,54 +6,136 @@
   <form method="post" class="flex flex-col gap-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
+    <label>Дата</label>
     <input type="date" name="date_" required class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="cash" placeholder="Итоговая касса (Z)" required class="border p-2 rounded" />
+    <label>Итоговая касса (Z)</label>
+    <input type="number" step="0.01" name="cash" required class="border p-2 rounded" />
     <input type="text" name="cash_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="cash_on_hand" placeholder="Остаток" required class="border p-2 rounded" />
+    <label>Остаток</label>
+    <input type="number" step="0.01" name="cash_on_hand" required class="border p-2 rounded" />
     <input type="text" name="cash_on_hand_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="terminal" placeholder="Терминал" required class="border p-2 rounded" />
+    <label>Терминал</label>
+    <input type="number" step="0.01" name="terminal" required class="border p-2 rounded" />
     <input type="text" name="terminal_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="changed_price" placeholder="Измененная цена" class="border p-2 rounded" />
+    <label>Измененная цена</label>
+    <input type="number" step="0.01" name="changed_price" class="border p-2 rounded" />
     <input type="text" name="changed_price_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="discount" placeholder="Уценка" class="border p-2 rounded" />
+    <label>Уценка</label>
+    <input type="number" step="0.01" name="discount" class="border p-2 rounded" />
     <input type="text" name="discount_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="promotion" placeholder="Акция" class="border p-2 rounded" />
+    <label>Акция</label>
+    <input type="number" step="0.01" name="promotion" class="border p-2 rounded" />
     <input type="text" name="promotion_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="to_store" placeholder="На магазин" class="border p-2 rounded" />
+    <label>На магазин</label>
+    <input type="number" step="0.01" name="to_store" class="border p-2 rounded" />
     <input type="text" name="to_store_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="refund" placeholder="Возврат" class="border p-2 rounded" />
+    <label>Возврат</label>
+    <input type="number" step="0.01" name="refund" class="border p-2 rounded" />
     <input type="text" name="refund_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="service" placeholder="Служебная" class="border p-2 rounded" />
+    <label>Служебная</label>
+    <input type="number" step="0.01" name="service" class="border p-2 rounded" />
     <input type="text" name="service_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
-    <input type="number" step="0.01" name="receipt" placeholder="Товарный чек" class="border p-2 rounded" />
+    <label>Товарный чек</label>
+    <input type="number" step="0.01" name="receipt" class="border p-2 rounded" />
     <input type="text" name="receipt_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
     <label>Сотрудники магазина</label>
-    <select name="store_employees" multiple class="border p-2 rounded h-40">
+    <select id="store-select" name="store_employees" multiple class="border p-2 rounded h-40">
       {% for emp in store_employees %}
-      <option value="{{ emp.id }}">{{ emp.name | e }}</option>
+      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}">{{ emp.name | e }}</option>
       {% endfor %}
     </select>
+    <div id="store-assignments" class="flex flex-col gap-4"></div>
 
     <label>Сотрудники склада</label>
-    <select name="warehouse_employees" multiple class="border p-2 rounded h-40">
+    <select id="warehouse-select" name="warehouse_employees" multiple class="border p-2 rounded h-40">
       <option value="">---</option>
       {% for emp in warehouse_employees %}
-      <option value="{{ emp.id }}">{{ emp.name | e }}</option>
+      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}">{{ emp.name | e }}</option>
       {% endfor %}
     </select>
+    <div id="warehouse-assignments" class="flex flex-col gap-4"></div>
+
+    <label>Зарплата итого</label>
+    <input type="number" name="salary_expenses" id="salary-total" value="0" readonly class="border p-2 rounded" />
 
     <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
   </form>
 </div>
+<script>
+function parseTime(t){
+  const [h,m] = t.split(':');
+  return new Date(0,0,0,h,m).getTime();
+}
+
+function setupSelect(selectId, assignmentsId){
+  const select = document.getElementById(selectId);
+  const assignmentsDiv = document.getElementById(assignmentsId);
+  const handler = () => updateAssignments(select, assignmentsDiv);
+  select.addEventListener('change', handler);
+  handler();
+}
+
+function updateAssignments(select, assignmentsDiv){
+  const selected = Array.from(select.selectedOptions);
+  const existingIds = Array.from(assignmentsDiv.children).map(d => d.dataset.userId);
+  existingIds.forEach(id => {
+    if(!selected.find(opt => opt.value === id)){
+      assignmentsDiv.querySelector(`div[data-user-id="${id}"]`).remove();
+    }
+  });
+  selected.forEach(opt => {
+    const id = opt.value;
+    if(assignmentsDiv.querySelector(`div[data-user-id="${id}"]`)) return;
+    const rate = parseFloat(opt.dataset.rate || 0);
+    const defStart = opt.dataset.start;
+    const defEnd = opt.dataset.end;
+    const container = document.createElement('div');
+    container.className = 'assignment border p-2 rounded';
+    container.dataset.userId = id;
+    container.innerHTML = `
+      <p class="font-semibold">${opt.text}</p>
+      <label>Начало</label>
+      <input type="time" name="start_time_${id}" value="${defStart}" class="border p-1 rounded start">
+      <label>Конец</label>
+      <input type="time" name="end_time_${id}" value="${defEnd}" class="border p-1 rounded end">
+      <label>Ставка</label>
+      <input type="number" step="1" class="border p-1 rounded amount" value="${Math.round(rate)}" readonly>
+    `;
+    assignmentsDiv.appendChild(container);
+    const startInput = container.querySelector('.start');
+    const endInput = container.querySelector('.end');
+    const amountInput = container.querySelector('.amount');
+    function recalc(){
+      if(!startInput.value || !endInput.value) return;
+      const workHours = (parseTime(endInput.value) - parseTime(startInput.value)) / 3600000;
+      const defHours = (parseTime(defEnd) - parseTime(defStart)) / 3600000;
+      amountInput.value = Math.round(rate * (workHours/defHours));
+      recalcTotal();
+    }
+    startInput.addEventListener('change', recalc);
+    endInput.addEventListener('change', recalc);
+    recalc();
+  });
+}
+
+function recalcTotal(){
+  let total = 0;
+  document.querySelectorAll('.amount').forEach(i => total += parseFloat(i.value||0));
+  document.getElementById('salary-total').value = Math.round(total);
+}
+
+setupSelect('store-select', 'store-assignments');
+setupSelect('warehouse-select', 'warehouse-assignments');
+</script>
 {% endblock %}
