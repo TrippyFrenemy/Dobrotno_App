@@ -73,6 +73,12 @@
   </form>
 </div>
 <script>
+const vacations = {{ vacations|tojson }};
+const userRole = "{{ user.role }}";
+const dateInput = document.querySelector('input[name="date_"]');
+const storeSelect = document.getElementById('store-select');
+const warehouseSelect = document.getElementById('warehouse-select');
+
 function parseTime(t){
   const [h,m] = t.split(':');
   return new Date(0,0,0,h,m).getTime();
@@ -138,7 +144,45 @@ function recalcTotal(){
   document.getElementById('salary-total').value = Math.round(total);
 }
 
+function updateVacationOptions(){
+  const dateVal = dateInput.value;
+  const d = dateVal ? new Date(dateVal) : null;
+  [storeSelect, warehouseSelect].forEach(select => {
+    Array.from(select.options).forEach(opt => {
+      const uid = parseInt(opt.value);
+      if(!uid) return;
+      let inVacation = false;
+      if(d){
+        for(const v of vacations){
+          if(v.user_id === uid){
+            const start = new Date(v.start);
+            const end = new Date(v.end);
+            if(d >= start && d <= end){ inVacation = true; break; }
+          }
+        }
+      }
+      if(inVacation){
+        if(userRole === 'manager' || userRole === 'admin'){
+          opt.disabled = true;
+          if(!opt.textContent.includes(' (отпуск)')) opt.textContent += ' (отпуск)';
+        } else {
+          opt.disabled = true;
+          opt.hidden = true;
+        }
+        opt.selected = false;
+      } else {
+        opt.disabled = false;
+        opt.hidden = false;
+        opt.textContent = opt.textContent.replace(' (отпуск)', '');
+      }
+    });
+    const assignmentsDiv = select.id === 'store-select' ? document.getElementById('store-assignments') : document.getElementById('warehouse-assignments');
+    updateAssignments(select, assignmentsDiv);
+  });
+}
 setupSelect('store-select', 'store-assignments');
 setupSelect('warehouse-select', 'warehouse-assignments');
+dateInput.addEventListener('change', updateVacationOptions);
+updateVacationOptions();
 </script>
 {% endblock %}

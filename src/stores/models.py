@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, ForeignKey, Boolean
+from datetime import datetime
+from sqlalchemy import Column, DateTime, Integer, String, Date, Numeric, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from src.database import Base
@@ -48,3 +49,17 @@ class StoreShiftEmployee(Base):
     shift = relationship("StoreShiftRecord", back_populates="employees")
     user = relationship("User")
     
+
+class StoreVacation(Base):
+    __tablename__ = "store_vacations"
+
+    id = Column(Integer, primary_key=True)
+    store_id = Column(ForeignKey("stores.id"), nullable=False)
+    user_id = Column(ForeignKey("users.id"), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    store = relationship("Store", backref="vacations")
+    user = relationship("User")

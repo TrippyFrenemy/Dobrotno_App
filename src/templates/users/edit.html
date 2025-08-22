@@ -25,6 +25,10 @@
     <label>Конец смены</label>
     <input type="time" name="shift_end" value="{{ user.shift_end.strftime('%H:%M') if user.shift_end else '20:00' }}" class="border p-2 rounded" />
     <label class="flex items-center gap-2">
+      <input type="checkbox" name="can_take_vacation" value="1" {% if user.can_take_vacation %}checked{% endif %} class="h-4 w-4" />
+      Может в отпуск
+    </label>
+    <label class="flex items-center gap-2">
       <input type="checkbox" name="is_active" value="1" {% if user.is_active %}checked{% endif %} class="h-4 w-4" />
       Активен
     </label>

@@ -4,7 +4,9 @@
 <h2 class="text-2xl font-semibold mb-4">🛍️ Смены за {{ month }}/{{ year }} {{ store_name }}</h2>
 
 <a href="/stores/{{ store_id }}/records/create" class="bg-blue-600 text-white px-4 py-2 rounded mb-4 inline-block">➕ Добавить смену</a>
-
+{% if user.role in ['manager', 'admin'] %}
+<a href="/stores/{{ store_id }}/vacations/create" class="bg-green-600 text-white px-4 py-2 rounded mb-4 inline-block">🏖 Добавить отпуск</a>
+{% endif %}
 <form method="get" class="mb-6 flex gap-4 items-end">
   <div>
     <label class="block text-sm">Месяц</label>
@@ -116,6 +118,42 @@
             <button class="text-green-600 hover:underline">Выплатить</button>
           </form>
         </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h4 class="text-lg font-semibold mt-4">🏖 Отпускные</h4>
+  <table class="w-full text-sm border mb-8">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="p-2 border">Сотрудник</th>
+        <th class="p-2 border">Период</th>
+        <th class="p-2 border">Сумма</th>
+        {% if user.role in ['manager', 'admin'] %}
+        <th class="p-2 border">Действия</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in data.vacations %}
+      <tr>
+        <td class="p-2 border">👤 {{ user_map.get(v.user_id, '—') }}</td>
+        <td class="p-2 border">{{ v.start_date }} — {{ v.end_date }}</td>
+        <td class="p-2 border">{{ '%.2f'|format(v.amount) }}</td>
+        {% if user.role in ['manager', 'admin'] %}
+        <td class="p-2 border">
+          <div class="flex gap-2">
+            <a href="/stores/{{ store_id }}/vacations/{{ v.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
+            {% if user.role == 'admin' %}
+            <form method="post" action="/stores/{{ store_id }}/vacations/{{ v.id }}/delete" onsubmit="return confirm('Удалить отпуск?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="text-red-600 hover:underline">Удалить</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>

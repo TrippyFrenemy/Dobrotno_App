@@ -64,7 +64,7 @@
     <label>Сотрудники магазина</label>
     <select id="store-select" name="store_employees" multiple required class="border p-2 rounded h-40">
       {% for emp in store_employees %}
-      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}" {% if emp.id in selected_store %}selected{% endif %}>{{ emp.name | e }}</option>
+      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}" {% if emp.id in selected_store %}selected{% endif %} {% if emp.id in vacation_users %}disabled class="bg-gray-100"{% endif %}>{{ emp.name | e }}{% if emp.id in vacation_users %} (отпуск){% endif %}</option>
       {% endfor %}
     </select>
     <div id="store-assignments" class="flex flex-col gap-4"></div>
@@ -74,7 +74,7 @@
     <select id="warehouse-select" name="warehouse_employees" multiple required class="border p-2 rounded h-40">
       <option value="">---</option>
       {% for emp in warehouse_employees %}
-      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}" {% if emp.id in selected_warehouse %}selected{% endif %}>{{ emp.name | e }}</option>
+      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}" {% if emp.id in selected_warehouse %}selected{% endif %} {% if emp.id in vacation_users %}disabled class="bg-gray-100"{% endif %}>{{ emp.name | e }}{% if emp.id in vacation_users %} (отпуск){% endif %}</option>
       {% endfor %}
     </select>
     <div id="warehouse-assignments" class="flex flex-col gap-4"></div>

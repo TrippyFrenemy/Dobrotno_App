@@ -25,6 +25,10 @@
     <input type="time" name="shift_start" value="09:00" class="border p-2 rounded" />
     <label>Конец смены</label>
     <input type="time" name="shift_end" value="20:00" class="border p-2 rounded" />
+    <label class="flex items-center gap-2">
+      <input type="checkbox" name="can_take_vacation" value="1" class="h-4 w-4" />
+      Может в отпуск
+    </label>
     <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Создать</button>
   </form>
 {% if error %}

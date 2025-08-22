@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Добавить отпуск{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
+  <h2 class="text-xl font-semibold mb-4">Добавить отпуск</h2>
+  <form method="post" class="flex flex-col gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label>Сотрудник</label>
+    <select id="user-select" name="user_id" required class="border p-2 rounded">
+      <option value="">---</option>
+      {% for emp in employees %}
+      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}">{{ emp.name | e }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Начало</label>
+    <input type="date" id="start-date" name="start_date" required class="border p-2 rounded">
+
+    <label>Конец</label>
+    <input type="date" id="end-date" name="end_date" required class="border p-2 rounded">
+
+    <label>Сумма</label>
+    <input type="number" step="0.01" id="amount" name="amount" readonly class="border p-2 rounded">
+
+    <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
+  </form>
+</div>
+<script>
+const userSelect = document.getElementById('user-select');
+const startDate = document.getElementById('start-date');
+const endDate = document.getElementById('end-date');
+const amountInput = document.getElementById('amount');
+function recalc(){
+  const rate = parseFloat(userSelect.selectedOptions[0]?.dataset.rate || 0);
+  if(!startDate.value || !endDate.value){ amountInput.value = ''; return; }
+  const start = new Date(startDate.value);
+  const end = new Date(endDate.value);
+  const diff = (end - start) / 86400000 + 1;
+  if(diff > 0 && diff <= 31){
+    amountInput.value = (rate * diff).toFixed(2);
+  } else {
+    amountInput.value = '';
+  }
+}
+userSelect.addEventListener('change', recalc);
+startDate.addEventListener('change', recalc);
+endDate.addEventListener('change', recalc);
+</script>
+{% endblock %}

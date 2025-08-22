@@ -16,6 +16,7 @@ class UserCreate(BaseModel):
     default_rate: Decimal = 0.0
     shift_start: time | None = None
     shift_end: time | None = None
+    can_take_vacation: bool = False
 
 class UserOut(BaseModel):
     id: int
@@ -25,6 +26,7 @@ class UserOut(BaseModel):
     default_rate: Decimal
     shift_start: time | None
     shift_end: time | None
+    can_take_vacation: bool
     created_at: datetime
 
     class Config:

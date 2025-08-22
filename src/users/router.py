@@ -35,8 +35,9 @@ async def user_create_form(
     role: str = Form(...),
     default_rate: float = Form(0.0),
     default_percent: float = Form(1.0),
-    shift_start: str = Form("10:00"),
+    shift_start: str = Form("09:00"),
     shift_end: str = Form("20:00"),
+    can_take_vacation: Optional[bool] = Form(False),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     admin: User = Depends(get_admin_user)
@@ -60,6 +61,7 @@ async def user_create_form(
         default_percent=default_percent,
         shift_start=time.fromisoformat(shift_start),
         shift_end=time.fromisoformat(shift_end),
+        can_take_vacation=can_take_vacation,
         hashed_password=pwd_context.hash(password),
     )
     session.add(new_user)
@@ -90,8 +92,9 @@ async def update_user(
     role: str = Form(...),
     default_rate: float = Form(0.0),
     default_percent: float = Form(1.0),
-    shift_start: str = Form("10:00"),
+    shift_start: str = Form("09:00"),
     shift_end: str = Form("20:00"),
+    can_take_vacation: Optional[bool] = Form(False),
     is_active: Optional[bool] = Form(False),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
@@ -108,6 +111,7 @@ async def update_user(
     user.role = role
     user.default_rate = default_rate
     user.default_percent = default_percent
+    user.can_take_vacation = can_take_vacation
     user.is_active = is_active
     user.shift_start = time.fromisoformat(shift_start)
     user.shift_end = time.fromisoformat(shift_end)

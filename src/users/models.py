@@ -28,6 +28,7 @@ class User(Base):
 
     shift_start = Column(Time, default=time(10, 0))
     shift_end = Column(Time, default=time(20, 0))
+    can_take_vacation = Column(Boolean, default=False)
 
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
