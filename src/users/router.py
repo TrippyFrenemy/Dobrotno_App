@@ -66,7 +66,7 @@ async def user_create_form(
     )
     session.add(new_user)
     await session.commit()
-    return RedirectResponse("/dashboard", status_code=302)
+    return RedirectResponse("/users/me", status_code=302)
 
 @router.get("/me", response_class=HTMLResponse)
 async def my_account_page(request: Request, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_async_session)):
