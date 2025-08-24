@@ -105,6 +105,8 @@ async def store_records(
             "terminal": Decimal("0.00"),
             "cash_processed": Decimal("0.00"),
             "cash_on_hand": Decimal("0.00"),
+            "expenses_total": Decimal("0.00"),
+            "cash_total": Decimal("0.00"),
         }
         salary_acc: dict[int, Decimal] = defaultdict(Decimal)
         current = start
@@ -127,6 +129,8 @@ async def store_records(
                         "terminal": terminal,
                         "cash_processed": cash_processed,
                         "cash_on_hand": cash_on_hand,
+                        "expense_total": r.expense_total,
+                        "cash_total": r.cash_total,
                         "changed_price": r.changed_price,
                         "discount": r.discount,
                         "promotion": r.promotion,
@@ -135,7 +139,13 @@ async def store_records(
                         "service": r.service,
                         "receipt": r.receipt,
                         "employees": [
-                            {"id": e.user_id, "is_warehouse": e.is_warehouse}
+                            {
+                                "id": e.user_id,
+                                "is_warehouse": e.is_warehouse,
+                                "start": e.start_time.strftime("%H:%M") if e.start_time else None,
+                                "end": e.end_time.strftime("%H:%M") if e.end_time else None,
+                                "salary": float(e.salary or 0),
+                            }
                             for e in r.employees
                             if e.user_id != manager_id
                         ],
@@ -145,6 +155,8 @@ async def store_records(
                 totals["terminal"] += terminal
                 totals["cash_processed"] += cash_processed
                 totals["cash_on_hand"] += cash_on_hand
+                totals["expenses_total"] += r.expense_total
+                totals["cash_total"] += r.cash_total
             else:
                 days.append(
                     {
@@ -154,6 +166,8 @@ async def store_records(
                         "terminal": Decimal("0.00"),
                         "cash_processed": Decimal("0.00"),
                         "cash_on_hand": Decimal("0.00"),
+                        "expense_total":  Decimal("0.00"),
+                        "cash_total": Decimal("0.00"),
                         "changed_price": Decimal("0.00"),
                         "discount": Decimal("0.00"),
                         "promotion": Decimal("0.00"),
@@ -388,7 +402,7 @@ async def create_record(
             )
         )
 
-    salary_expenses = await compute_salary(session, assignments)
+        salary_expenses, salary_map = await compute_salary(session, assignments)
 
     comments: dict[str, str] = {}
     if cash_comment:
@@ -431,9 +445,31 @@ async def create_record(
     session.add(record)
     await session.flush()
     for uid in store_employees:
-        session.add(StoreShiftEmployee(shift_id=record.id, user_id=uid, is_warehouse=False))
+        s_val = form.get(f"start_time_{uid}")
+        e_val = form.get(f"end_time_{uid}")
+        session.add(
+            StoreShiftEmployee(
+                shift_id=record.id,
+                user_id=uid,
+                is_warehouse=False,
+                start_time=time.fromisoformat(s_val) if s_val else None,
+                end_time=time.fromisoformat(e_val) if e_val else None,
+                salary=salary_map.get(uid, Decimal("0")),
+            )
+        )
     for uid in warehouse_employees:
-        session.add(StoreShiftEmployee(shift_id=record.id, user_id=uid, is_warehouse=True))
+        s_val = form.get(f"start_time_{uid}")
+        e_val = form.get(f"end_time_{uid}")
+        session.add(
+            StoreShiftEmployee(
+                shift_id=record.id,
+                user_id=uid,
+                is_warehouse=True,
+                start_time=time.fromisoformat(s_val) if s_val else None,
+                end_time=time.fromisoformat(e_val) if e_val else None,
+                salary=salary_map.get(uid, Decimal("0")),
+            )
+        )
     await session.commit()
     return RedirectResponse(f"/stores/{store_id}/records", status_code=302)
 
@@ -487,6 +523,8 @@ async def edit_record_page(
     warehouse_employees = wh_q.scalars().all()
     selected_store = [e.user_id for e in record.employees if not e.is_warehouse]
     selected_warehouse = [e.user_id for e in record.employees if e.is_warehouse]
+    start_times = {e.user_id: (e.start_time or e.user.shift_start).strftime('%H:%M') for e in record.employees}
+    end_times = {e.user_id: (e.end_time or e.user.shift_end).strftime('%H:%M') for e in record.employees}
     vac_q = await session.execute(
         select(StoreVacation.user_id).where(
             StoreVacation.store_id == store_id,
@@ -505,6 +543,8 @@ async def edit_record_page(
             "warehouse_employees": warehouse_employees,
             "selected_store": selected_store,
             "selected_warehouse": selected_warehouse,
+            "start_times": start_times,
+            "end_times": end_times,
             "vacation_users": vacation_users,
             "csrf_token": csrf_token,
             "store_id": store_id,
@@ -609,15 +649,37 @@ async def edit_record(
                 form.get(f"end_time_{uid}"),
             )
         )
-    salary_expenses = await compute_salary(session, assignments)
+    salary_expenses, salary_map = await compute_salary(session, assignments)
     record.salary_expenses = salary_expenses
     await session.execute(
         StoreShiftEmployee.__table__.delete().where(StoreShiftEmployee.shift_id == record_id)
     )
     for uid in store_employees:
-        session.add(StoreShiftEmployee(shift_id=record.id, user_id=uid, is_warehouse=False))
+        s_val = form.get(f"start_time_{uid}")
+        e_val = form.get(f"end_time_{uid}")
+        session.add(
+            StoreShiftEmployee(
+                shift_id=record.id,
+                user_id=uid,
+                is_warehouse=False,
+                start_time=time.fromisoformat(s_val) if s_val else None,
+                end_time=time.fromisoformat(e_val) if e_val else None,
+                salary=salary_map.get(uid, Decimal("0")),
+            )
+        )
     for uid in warehouse_employees:
-        session.add(StoreShiftEmployee(shift_id=record.id, user_id=uid, is_warehouse=True))
+        s_val = form.get(f"start_time_{uid}")
+        e_val = form.get(f"end_time_{uid}")
+        session.add(
+            StoreShiftEmployee(
+                shift_id=record.id,
+                user_id=uid,
+                is_warehouse=True,
+                start_time=time.fromisoformat(s_val) if s_val else None,
+                end_time=time.fromisoformat(e_val) if e_val else None,
+                salary=salary_map.get(uid, Decimal("0")),
+            )
+        )
     await session.commit()
     return RedirectResponse(f"/stores/{store_id}/records", status_code=302)
 

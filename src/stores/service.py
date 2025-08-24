@@ -13,10 +13,10 @@ from src.stores.models import StoreVacation
 
 async def compute_salary(
     session: AsyncSession, assignments: List[tuple[int, str | None, str | None]]
-) -> Decimal:
-    """Calculate total salary based on user default rate and worked hours."""
+) -> tuple[Decimal, dict[int, Decimal]]:
+    """Calculate total salary and per-user amounts based on worked hours."""
     if not assignments:
-        return Decimal("0.00")
+        return Decimal("0.00"), {}
     ids = [uid for uid, _, _ in assignments]
     q = await session.execute(select(User).where(User.id.in_(ids)))
     users = {u.id: u for u in q.scalars().all()}
@@ -25,6 +25,7 @@ async def compute_salary(
         return time.fromisoformat(value) if value else fallback
 
     total = Decimal("0.00")
+    per_user: dict[int, Decimal] = {}
     for uid, start_s, end_s in assignments:
         user = users.get(uid)
         if not user:
@@ -40,8 +41,10 @@ async def compute_salary(
             - datetime.combine(date.today(), start_t)
         ).total_seconds() / 3600
         coeff = Decimal(work_hours) / Decimal(def_hours)
-        total += user.default_rate * coeff
-    return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        amount = (user.default_rate * coeff).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        per_user[uid] = amount
+        total += amount
+    return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), per_user
 
 async def get_config_manager(session: AsyncSession) -> User | None:
     if not MANAGER_EMAIL:

@@ -30,10 +30,12 @@
       <tr>
         <th class="p-2 border text-left">Дата</th>
         {% if user.role in ['manager', 'admin'] %}
-        <th class="p-2 border text-right">Итоговая касса (Z)</th>
+        <th class="p-2 border text-right">Итоговая касса (1C)</th>
+        <th class="p-2 border text-right">Итоговая касса</th>
         <th class="p-2 border text-right">Терминал</th>
         <th class="p-2 border text-right">Наличные по кассе</th>
         <th class="p-2 border text-right">Наличные в кассе (конец)</th>
+        <th class="p-2 border text-right">Расходы</th>
         {% endif %}
         <th class="p-2 border text-left">Сотрудники</th>
         {% if user.role in ['manager', 'admin'] %}
@@ -47,14 +49,22 @@
         <td class="p-2 border whitespace-nowrap">{{ rec.date }}</td>
         {% if user.role in ['manager', 'admin'] %}
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash_total) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.terminal) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash_processed) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(rec.cash_on_hand) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(rec.expense_total) }}</td>
         {% endif %}
         <td class="p-2 border">
+          <ul class="list-disc list-inside">
           {% for e in rec.employees %}
-            {{ user_map.get(e.id, '—') }}{% if e.is_warehouse %} (склад){% endif %}<br>
+            <li>
+              <span class="font-medium">{{ user_map.get(e.id, "—") | e }}{% if e.is_warehouse %} (склад){% endif %}</span>
+              <span class="text-gray-500 text-xs">({{ e.start }}–{{ e.end }})</span>
+              {% if user.role != 'cashier' and e.salary %}<span class="ml-1">{{ "%.0f"|format(e.salary) }}</span>{% endif %}
+            </li>
           {% endfor %}
+          </ul>
         </td>
         {% if user.role in ['manager', 'admin'] %}
         <td class="p-2 border">
@@ -81,9 +91,11 @@
       <tr class="bg-gray-50 font-semibold">
         <td class="p-2 border text-right">ИТОГО:</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.z) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.cash_total) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.terminal) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.cash_processed) }}</td>
         <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.cash_on_hand) }}</td>
+        <td class="p-2 border text-right">{{ '%.2f'|format(data.totals.expenses_total) }}</td>
         <td class="p-2 border"></td>
         <td class="p-2 border"></td>
       </tr>
@@ -160,4 +172,29 @@
   </table>
   {% endif %}
 {% endfor %}
+<div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+  <div class="bg-white p-4 rounded shadow max-w-md" id="detail-content"></div>
+</div>
+<script>
+document.querySelectorAll('.details-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const data = JSON.parse(btn.dataset.details);
+    let html = '<h3 class="text-lg font-semibold mb-2">Детали смены</h3><ul class="list-disc pl-4">';
+    html += `<li>Переоценка: ${parseFloat(data.changed_price).toFixed(2)}</li>`;
+    html += `<li>Уценка: ${parseFloat(data.discount).toFixed(2)}</li>`;
+    html += `<li>Акция: ${parseFloat(data.promotion).toFixed(2)}</li>`;
+    html += `<li>На магазин: ${parseFloat(data.to_store).toFixed(2)}</li>`;
+    html += `<li>Возврат: ${parseFloat(data.refund).toFixed(2)}</li>`;
+    html += `<li>Служебная: ${parseFloat(data.service).toFixed(2)}</li>`;
+    html += `<li>Товарный чек: ${parseFloat(data.receipt).toFixed(2)}</li>`;
+    html += `<li>Зарплата: ${parseFloat(data.salary_expenses).toFixed(2)}</li>`;
+    html += '</ul>';
+    document.getElementById('detail-content').innerHTML = html;
+    document.getElementById('detail-modal').classList.remove('hidden');
+  });
+});
+document.getElementById('detail-modal').addEventListener('click', e=>{
+  if(e.target.id==='detail-modal') e.target.classList.add('hidden');
+});
+</script>
 {% endblock %}

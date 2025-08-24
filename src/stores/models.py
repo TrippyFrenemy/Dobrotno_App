@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, DateTime, Integer, String, Date, Numeric, ForeignKey, Boolean
+from sqlalchemy import Column, DateTime, Integer, String, Date, Numeric, ForeignKey, Boolean, Time
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from src.database import Base
@@ -35,8 +35,12 @@ class StoreShiftRecord(Base):
     employees = relationship("StoreShiftEmployee", back_populates="shift")
     
     @property
-    def expense(self) -> Numeric:
-        return (self.to_store or 0) + (self.service or 0) + (self.refund or 0)
+    def expense_total(self) -> Numeric:
+        return (self.to_store or 0) + (self.service or 0)
+    
+    @property
+    def cash_total(self) -> Numeric:
+        return (self.cash or 0) - (self.changed_price or 0) - (self.discount or 0) - (self.refund or 0) + (self.receipt or 0)
 
 class StoreShiftEmployee(Base):
     __tablename__ = "store_shift_employees"
@@ -45,7 +49,10 @@ class StoreShiftEmployee(Base):
     shift_id = Column(ForeignKey("store_shift_records.id"), nullable=False)
     user_id = Column(ForeignKey("users.id"), nullable=False)
     is_warehouse = Column(Boolean, default=False, nullable=False)
-
+    start_time = Column(Time, nullable=True)
+    end_time = Column(Time, nullable=True)
+    salary = Column(Numeric(10, 2), nullable=False, default=0)
+    
     shift = relationship("StoreShiftRecord", back_populates="employees")
     user = relationship("User")
     
