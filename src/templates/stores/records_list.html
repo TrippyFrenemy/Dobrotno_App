@@ -70,7 +70,7 @@
         <td class="p-2 border">
           {% if rec.id %}
           <div class="flex justify-center gap-2">
-            <a href="/stores/{{ store_id }}/records/{{ rec.id }}/edit" class="text-blue-600 hover:underline">Изменить</a>
+            <button type="button" class="view-btn text-blue-600 hover:underline" data-store="{{ store_id }}" data-id="{{ rec.id }}">Просмотр</button>
             {% if user.role == 'admin' %}
             <form method="post" action="/stores/{{ store_id }}/records/{{ rec.id }}/delete" onsubmit="return confirm('Удалить смену?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -172,25 +172,49 @@
   </table>
   {% endif %}
 {% endfor %}
-<div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
-  <div class="bg-white p-4 rounded shadow max-w-md" id="detail-content"></div>
+<div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center backdrop-blur-sm">
+  <div class="bg-white p-6 rounded-lg shadow-lg relative w-full max-w-lg">
+    <button id="detail-close" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+    <div id="detail-content"></div>
+  </div>
 </div>
 <script>
-document.querySelectorAll('.details-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    const data = JSON.parse(btn.dataset.details);
-    let html = '<h3 class="text-lg font-semibold mb-2">Детали смены</h3><ul class="list-disc pl-4">';
-    html += `<li>Переоценка: ${parseFloat(data.changed_price).toFixed(2)}</li>`;
-    html += `<li>Уценка: ${parseFloat(data.discount).toFixed(2)}</li>`;
-    html += `<li>Акция: ${parseFloat(data.promotion).toFixed(2)}</li>`;
-    html += `<li>На магазин: ${parseFloat(data.to_store).toFixed(2)}</li>`;
-    html += `<li>Возврат: ${parseFloat(data.refund).toFixed(2)}</li>`;
-    html += `<li>Служебная: ${parseFloat(data.service).toFixed(2)}</li>`;
-    html += `<li>Товарный чек: ${parseFloat(data.receipt).toFixed(2)}</li>`;
-    html += `<li>Зарплата: ${parseFloat(data.salary_expenses).toFixed(2)}</li>`;
-    html += '</ul>';
-    document.getElementById('detail-content').innerHTML = html;
-    document.getElementById('detail-modal').classList.remove('hidden');
+const detailModal = document.getElementById('detail-modal');
+const detailContent = document.getElementById('detail-content');
+function closeDetailModal(){
+  detailModal.classList.add('hidden');
+  detailModal.classList.remove('flex');
+}
+document.getElementById('detail-close').addEventListener('click', closeDetailModal);
+detailModal.addEventListener('click', e=>{ if(e.target.id==='detail-modal') closeDetailModal(); });
+document.querySelectorAll('.view-btn').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    const storeId = btn.dataset.store;
+    const recordId = btn.dataset.id;
+    const res = await fetch(`/stores/${storeId}/records/${recordId}`);
+    if(res.ok){
+      const data = await res.json();
+      let html = '<h3 class="text-lg font-semibold mb-4">Детали смены</h3>';
+      html += '<table class="w-full text-sm"><tbody>';
+      html += `<tr><td class="pr-4 text-gray-600">Итоговая касса (1C):</td><td>${(data.cash ?? 0).toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Итоговая касса:</td><td>${(data.cash_total ?? 0).toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Терминал:</td><td>${(data.terminal ?? 0).toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Переоценка:</td><td>${(data.changed_price ?? 0).toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Наличные по кассе:</td><td>${(data.cash_on_hand ?? 0).toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Уценка:</td><td>${data.discount.toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Акция:</td><td>${data.promotion.toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">На магазин:</td><td>${data.to_store.toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Возврат:</td><td>${data.refund.toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Служебная:</td><td>${data.service.toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Товарный чек:</td><td>${data.receipt.toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Расходы:</td><td>${(data.expenses ?? 0).toFixed(2)}</td></tr>`;
+      html += `<tr><td class="pr-4 text-gray-600">Зарплата:</td><td>${data.salary_expenses.toFixed(2)}</td></tr>`;
+      html += '</tbody></table>';
+      detailContent.innerHTML = html;
+      detailModal.classList.remove('hidden');
+      detailModal.classList.add('flex');
+    }
+
   });
 });
 document.getElementById('detail-modal').addEventListener('click', e=>{

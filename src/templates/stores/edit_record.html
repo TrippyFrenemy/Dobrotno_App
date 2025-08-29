@@ -7,63 +7,53 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <!-- Дата (только для просмотра) -->
+    <label>Дата</label>
     <input type="date" name="date_" value="{{ record.date }}" required class="border p-2 rounded" readonly />
 
     <!-- Поля ввода сумм -->
+    <label>Итоговая касса (Z)</label>
     <input type="number" step="0.01" name="cash" value="{{ record.cash }}" required class="border p-2 rounded" />
-    {% if record.cash or record.comments.get('cash') %}
-    <input type="text" name="cash_comment" value="{{ record.comments.get('cash','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="cash_comment" placeholder="Комментарий" value="{{ record.comments.get('cash','') }}" class="border p-2 rounded" />
 
+    <label>Остаток</label>
     <input type="number" step="0.01" name="cash_on_hand" value="{{ record.cash_on_hand }}" required class="border p-2 rounded" />
-    {% if record.cash_on_hand or record.comments.get('cash_on_hand') %}
-    <input type="text" name="cash_on_hand_comment" value="{{ record.comments.get('cash_on_hand','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="cash_on_hand_comment" placeholder="Комментарий" value="{{ record.comments.get('cash_on_hand','') }}" class="border p-2 rounded" />
 
+    <label>Терминал</label>
     <input type="number" step="0.01" name="terminal" value="{{ record.terminal }}" required class="border p-2 rounded" />
-    {% if record.terminal or record.comments.get('terminal') %}
-    <input type="text" name="terminal_comment" value="{{ record.comments.get('terminal','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="terminal_comment" placeholder="Комментарий" value="{{ record.comments.get('terminal','') }}" class="border p-2 rounded" />
 
+    <label>Измененная цена</label>
     <input type="number" step="0.01" name="changed_price" value="{{ record.changed_price }}" class="border p-2 rounded" />
-    {% if record.changed_price or record.comments.get('changed_price') %}
-    <input type="text" name="changed_price_comment" value="{{ record.comments.get('changed_price','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="changed_price_comment" placeholder="Комментарий" value="{{ record.comments.get('changed_price','') }}" class="border p-2 rounded" />
 
+    <label>Уценка</label>
     <input type="number" step="0.01" name="discount" value="{{ record.discount }}" class="border p-2 rounded" />
-    {% if record.discount or record.comments.get('discount') %}
-    <input type="text" name="discount_comment" value="{{ record.comments.get('discount','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="discount_comment" placeholder="Комментарий" value="{{ record.comments.get('discount','') }}" class="border p-2 rounded" />
 
+    <label>Акция</label>
     <input type="number" step="0.01" name="promotion" value="{{ record.promotion }}" class="border p-2 rounded" />
-    {% if record.promotion or record.comments.get('promotion') %}
-    <input type="text" name="promotion_comment" value="{{ record.comments.get('promotion','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="promotion_comment" placeholder="Комментарий" value="{{ record.comments.get('promotion','') }}" class="border p-2 rounded" />
 
+    <label>На магазин</label>
     <input type="number" step="0.01" name="to_store" value="{{ record.to_store }}" class="border p-2 rounded" />
-    {% if record.to_store or record.comments.get('to_store') %}
-    <input type="text" name="to_store_comment" value="{{ record.comments.get('to_store','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="to_store_comment" placeholder="Комментарий" value="{{ record.comments.get('to_store','') }}" class="border p-2 rounded" />
 
+    <label>Возврат</label>
     <input type="number" step="0.01" name="refund" value="{{ record.refund }}" class="border p-2 rounded" />
-    {% if record.refund or record.comments.get('refund') %}
-    <input type="text" name="refund_comment" value="{{ record.comments.get('refund','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="refund_comment" placeholder="Комментарий" value="{{ record.comments.get('refund','') }}" class="border p-2 rounded" />
 
+    <label>Служебная</label>
     <input type="number" step="0.01" name="service" value="{{ record.service }}" class="border p-2 rounded" />
-    {% if record.service or record.comments.get('service') %}
-    <input type="text" name="service_comment" value="{{ record.comments.get('service','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="service_comment" placeholder="Комментарий" value="{{ record.comments.get('service','') }}" class="border p-2 rounded" />
 
+    <label>Товарный чек</label>
     <input type="number" step="0.01" name="receipt" value="{{ record.receipt }}" class="border p-2 rounded" />
-    {% if record.receipt or record.comments.get('receipt') %}
-    <input type="text" name="receipt_comment" value="{{ record.comments.get('receipt','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="receipt_comment" placeholder="Комментарий" value="{{ record.comments.get('receipt','') }}" class="border p-2 rounded" />
 
+    <label>Расходы</label>
     <input type="number" step="0.01" name="expenses" value="{{ record.expenses }}" class="border p-2 rounded" />
-    {% if record.expenses or record.comments.get('expenses') %}
-    <input type="text" name="expenses_comment" value="{{ record.comments.get('expenses','') }}" class="border p-2 rounded" />
-    {% endif %}
+    <input type="text" name="expenses_comment" placeholder="Комментарий" value="{{ record.comments.get('expenses','') }}" class="border p-2 rounded" />
 
     <!-- Сотрудники магазина -->
     <label>Сотрудники магазина</label>
