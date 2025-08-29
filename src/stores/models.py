@@ -28,6 +28,7 @@ class StoreShiftRecord(Base):
     refund = Column(Numeric(10, 2), nullable=False, default=0)
     service = Column(Numeric(10, 2), nullable=False, default=0)
     receipt = Column(Numeric(10, 2), nullable=False, default=0)
+    expenses = Column(Numeric(10, 2), nullable=False, default=0)
     salary_expenses = Column(Numeric(10, 2), nullable=False, default=0)
     comments = Column(JSONB, nullable=False, default=dict)
 
@@ -36,7 +37,7 @@ class StoreShiftRecord(Base):
     
     @property
     def expense_total(self) -> Numeric:
-        return (self.to_store or 0) + (self.service or 0)
+        return (self.to_store or 0) + (self.service or 0) + (self.expenses or 0)
     
     @property
     def cash_total(self) -> Numeric:

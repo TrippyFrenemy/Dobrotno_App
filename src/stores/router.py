@@ -138,6 +138,7 @@ async def store_records(
                         "refund": r.refund,
                         "service": r.service,
                         "receipt": r.receipt,
+                        "expences": r.expenses,
                         "employees": [
                             {
                                 "id": e.user_id,
@@ -175,6 +176,7 @@ async def store_records(
                         "refund": Decimal("0.00"),
                         "service": Decimal("0.00"),
                         "receipt": Decimal("0.00"),
+                        "expences": Decimal("0.00"),
                         "employees": [],
                     }
                 )
@@ -350,6 +352,7 @@ async def create_record(
     refund: Decimal = Form(0),
     service: Decimal = Form(0),
     receipt: Decimal = Form(0),
+    expenses: Decimal = Form(0),
     cash_comment: str = Form(""),
     cash_on_hand_comment: str = Form(""),
     terminal_comment: str = Form(""),
@@ -360,6 +363,7 @@ async def create_record(
     refund_comment: str = Form(""),
     service_comment: str = Form(""),
     receipt_comment: str = Form(""),
+    expenses_comment: str = Form(""),
     store_employees: List[str] = Form([]),
     warehouse_employees: List[str] = Form([]),
     csrf_token: str = Form(...),
@@ -425,6 +429,8 @@ async def create_record(
         comments["service"] = service_comment
     if receipt_comment:
         comments["receipt"] = receipt_comment
+    if expenses_comment:
+        comments["expenses"] = receipt_comment
     record = StoreShiftRecord(
         store_id=store_id,
         date=date_,
@@ -438,6 +444,7 @@ async def create_record(
         refund=refund,
         service=service,
         receipt=receipt,
+        expenses=expenses,
         salary_expenses=salary_expenses,
         comments=comments,
     )
@@ -569,6 +576,7 @@ async def edit_record(
     refund: Decimal = Form(0),
     service: Decimal = Form(0),
     receipt: Decimal = Form(0),
+    expenses: Decimal = Form(0),
     cash_comment: str = Form(""),
     cash_on_hand_comment: str = Form(""),
     terminal_comment: str = Form(""),
@@ -579,6 +587,7 @@ async def edit_record(
     refund_comment: str = Form(""),
     service_comment: str = Form(""),
     receipt_comment: str = Form(""),
+    expenses_comment: str = Form(""),
     store_employees: List[str] = Form([]),
     warehouse_employees: List[str] = Form([]),
     csrf_token: str = Form(...),
@@ -603,6 +612,7 @@ async def edit_record(
     record.refund = refund
     record.service = service
     record.receipt = receipt
+    record.expenses = expenses
 
     comments = dict(record.comments or {})
     def set_comment(field: str, value: str):
@@ -621,6 +631,7 @@ async def edit_record(
     set_comment("refund", refund_comment)
     set_comment("service", service_comment)
     set_comment("receipt", receipt_comment)
+    set_comment("expenses", expenses_comment)
     record.comments = comments
 
     store_employees = [int(uid) for uid in store_employees if uid.strip().isdigit()]

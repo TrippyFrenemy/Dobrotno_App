@@ -10,15 +10,24 @@ import hashlib
 def get_file_hash(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
+        for line in f:
+            if line.startswith(b"--"):
+                continue
+            h.update(line)
     return h.hexdigest()
 
 @shared_task
 def send_db_backup_task():
     filename = f"/fastapi_app/tmp/backup_{DB_NAME}.sql"
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    hash_path = filename + ".sha256"
+    hash_path = f"{filename}.sha256"
+    old_hash = None
+
+    if os.path.exists(hash_path):
+        with open(hash_path, "r") as f:
+            old_hash = f.read().strip()
+    else:
+        old_hash = get_file_hash(filename) if os.path.exists(filename) else None
 
     print(f"📦 Создание бекапа базы данных {DB_NAME}...")
 
@@ -26,18 +35,13 @@ def send_db_backup_task():
         subprocess.run(
             ["pg_dump", "-h", DB_HOST, "-U", DB_USER, "-d", DB_NAME, "--exclude-table-data=user_logs", "-f", filename],
             check=True,
-            env={**os.environ, "PGPASSWORD": DB_PASS}
+            env={**os.environ, "PGPASSWORD": DB_PASS},
         )
     except subprocess.CalledProcessError as e:
         print(f"❌ Ошибка при создании дампа: {e}")
         return
 
     current_hash = get_file_hash(filename)
-    old_hash = None
-
-    if os.path.exists(hash_path):
-        with open(hash_path, "r") as f:
-            old_hash = f.read().strip()
 
     if current_hash == old_hash:
         print("⏩ Изменений в БД нет — бэкап не отправляется")

@@ -48,11 +48,15 @@
     <label>Товарный чек</label>
     <input type="number" step="0.01" name="receipt" class="border p-2 rounded" />
     <input type="text" name="receipt_comment" placeholder="Комментарий" class="border p-2 rounded" />
+    
+    <label>Расходы</label>
+    <input type="number" step="0.01" name="expenses" class="border p-2 rounded" />
+    <input type="text" name="expenses_comment" placeholder="Комментарий" class="border p-2 rounded" />
 
     <label>Сотрудники магазина</label>
     <select id="store-select" name="store_employees" multiple class="border p-2 rounded h-40">
       {% for emp in store_employees %}
-      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}">{{ emp.name | e }}</option>
+      <option value="{{ emp.id }}"{% if user.role != 'cashier' %} data-rate="{{ emp.default_rate }}"{% endif %} data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}">{{ emp.name | e }}</option>
       {% endfor %}
     </select>
     <div id="store-assignments" class="flex flex-col gap-4"></div>
@@ -61,13 +65,15 @@
     <select id="warehouse-select" name="warehouse_employees" multiple class="border p-2 rounded h-40">
       <option value="">---</option>
       {% for emp in warehouse_employees %}
-      <option value="{{ emp.id }}" data-rate="{{ emp.default_rate }}" data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}">{{ emp.name | e }}</option>
+      <option value="{{ emp.id }}"{% if user.role != 'cashier' %} data-rate="{{ emp.default_rate }}"{% endif %} data-start="{{ emp.shift_start.strftime('%H:%M') }}" data-end="{{ emp.shift_end.strftime('%H:%M') }}">{{ emp.name | e }}</option>
       {% endfor %}
     </select>
     <div id="warehouse-assignments" class="flex flex-col gap-4"></div>
 
+    {% if user.role != 'cashier' %}
     <label>Зарплата итого</label>
     <input type="number" name="salary_expenses" id="salary-total" value="0" readonly class="border p-2 rounded" />
+    {% endif %}
 
     <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
   </form>
@@ -75,6 +81,7 @@
 <script>
 const vacations = {{ vacations|tojson }};
 const userRole = "{{ user.role }}";
+const showSalary = userRole !== 'cashier';
 const dateInput = document.querySelector('input[name="date_"]');
 const storeSelect = document.getElementById('store-select');
 const warehouseSelect = document.getElementById('warehouse-select');
@@ -111,37 +118,46 @@ function updateAssignments(select, assignmentsDiv){
     const container = document.createElement('div');
     container.className = 'assignment border p-2 rounded';
     container.dataset.userId = id;
+    let salaryHtml = '';
+    if (showSalary) {
+      salaryHtml = `
+      <label>Ставка</label>
+      <input type="number" step="1" class="border p-1 rounded amount" value="${Math.round(rate)}" readonly>`;
+    }
     container.innerHTML = `
       <p class="font-semibold">${opt.text}</p>
       <label>Начало</label>
       <input type="time" name="start_time_${id}" value="${defStart}" class="border p-1 rounded start">
       <label>Конец</label>
       <input type="time" name="end_time_${id}" value="${defEnd}" class="border p-1 rounded end">
-      <label>Ставка</label>
-      <input type="number" step="1" class="border p-1 rounded amount" value="${Math.round(rate)}" readonly>
+      ${salaryHtml}
     `;
     assignmentsDiv.appendChild(container);
 
     const startInput = container.querySelector('.start');
     const endInput = container.querySelector('.end');
-    const amountInput = container.querySelector('.amount');
-    function recalc(){
-      if(!startInput.value || !endInput.value) return;
-      const workHours = (parseTime(endInput.value) - parseTime(startInput.value)) / 3600000;
-      const defHours = (parseTime(defEnd) - parseTime(defStart)) / 3600000;
-      amountInput.value = Math.round(rate * (workHours/defHours));
-      recalcTotal();
+    if (showSalary) {
+      const amountInput = container.querySelector('.amount');
+      function recalc(){
+        if(!startInput.value || !endInput.value) return;
+        const workHours = (parseTime(endInput.value) - parseTime(startInput.value)) / 3600000;
+        const defHours = (parseTime(defEnd) - parseTime(defStart)) / 3600000;
+        amountInput.value = Math.round(rate * (workHours/defHours));
+        recalcTotal();
+      }
+      startInput.addEventListener('change', recalc);
+      endInput.addEventListener('change', recalc);
+      recalc();
     }
-    startInput.addEventListener('change', recalc);
-    endInput.addEventListener('change', recalc);
-    recalc();
   });
 }
 
 function recalcTotal(){
+  if(!showSalary) return;
   let total = 0;
   document.querySelectorAll('.amount').forEach(i => total += parseFloat(i.value||0));
-  document.getElementById('salary-total').value = Math.round(total);
+  const totalInput = document.getElementById('salary-total');
+  if(totalInput) totalInput.value = Math.round(total);
 }
 
 function updateVacationOptions(){

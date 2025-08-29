@@ -60,6 +60,11 @@
     <input type="text" name="receipt_comment" value="{{ record.comments.get('receipt','') }}" class="border p-2 rounded" />
     {% endif %}
 
+    <input type="number" step="0.01" name="expenses" value="{{ record.expenses }}" class="border p-2 rounded" />
+    {% if record.expenses or record.comments.get('expenses') %}
+    <input type="text" name="expenses_comment" value="{{ record.comments.get('expenses','') }}" class="border p-2 rounded" />
+    {% endif %}
+
     <!-- Сотрудники магазина -->
     <label>Сотрудники магазина</label>
     <select id="store-select" name="store_employees" multiple required class="border p-2 rounded h-40">
@@ -147,7 +152,7 @@ function recalcTotal(){
   document.querySelectorAll('.amount').forEach(i => total += parseFloat(i.value||0));
   document.getElementById('salary-total').value = Math.round(total);
 }
-
+updateAssignments();
 setupSelect('store-select', 'store-assignments');
 setupSelect('warehouse-select', 'warehouse-assignments');
 </script>
