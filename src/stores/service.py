@@ -83,9 +83,9 @@ def summarize_salaries(salary_acc: dict[int, Decimal], payouts: dict[int, Decima
         salaries.append(
             {
                 "user_id": uid,
-                "total": amount.quantize(Decimal("0.01")),
-                "paid": paid.quantize(Decimal("0.01")),
-                "remaining": (amount - paid).quantize(Decimal("0.01")),
+                "total": amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP),
+                "paid": paid.quantize(Decimal("1"), rounding=ROUND_HALF_UP),
+                "remaining": (amount - paid).quantize(Decimal("1"), rounding=ROUND_HALF_UP),
             }
         )
     return salaries
@@ -97,7 +97,7 @@ def summarize_vacations(vac_acc: dict[int, Decimal]):
         vacations.append(
             {
                 "user_id": uid,
-                "total": amount.quantize(Decimal("0.01")),
+                "total": amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP),
             }
         )
     return vacations

@@ -215,3 +215,4 @@ tmp/
 *.pem
 
 backup*
+config/
