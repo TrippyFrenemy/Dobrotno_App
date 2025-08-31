@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 from src.config import CELERY_BACHUP_RATE, REDIS_HOST, REDIS_PORT
 
 celery_app = Celery(
@@ -19,10 +20,10 @@ celery_app.conf.timezone = "UTC"
 celery_app.conf.beat_schedule = {
     "backup-every-12-hours": {
         "task": "src.tasks.backup.send_db_backup_task",
-        "schedule": CELERY_BACHUP_RATE,  # 12 hours in seconds
+        "schedule": crontab(hour='8-20', minute=0),
     },
     "clean-old-logs-daily": {
         "task": "src.tasks.cleanup.clean_old_logs",
-        "schedule": 86000, # 24 hours in seconds - 400
+        "schedule": crontab(hour=0, minute=0),
     },
 }
