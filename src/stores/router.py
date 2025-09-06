@@ -307,9 +307,9 @@ async def create_record_page(
     user: User = Depends(get_cashier_or_manager_or_admin),
 ):
     csrf_token = await generate_csrf_token(user.id)
-    store_q = await session.execute(select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True))
+    store_q = await session.execute(select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True).order_by(User.name))
     store_employees = store_q.scalars().all()
-    wh_q = await session.execute(select(User).where(User.role == UserRole.WAREHOUSE_WORKER, User.is_active == True))
+    wh_q = await session.execute(select(User).where(User.role == UserRole.WAREHOUSE_WORKER, User.is_active == True).order_by(User.name))
     warehouse_employees = wh_q.scalars().all()
     vac_q = await session.execute(
         select(StoreVacation.user_id, StoreVacation.start_date, StoreVacation.end_date).where(
@@ -528,14 +528,14 @@ async def edit_record_page(
     csrf_token = await generate_csrf_token(user.id)
 
     store_q = await session.execute(
-        select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True)
+        select(User).where(User.role == UserRole.STORE_WORKER, User.is_active == True).order_by(User.name)
     )
     store_employees = store_q.scalars().all()
     manager_user = await get_config_manager(session)
     if manager_user and manager_user not in store_employees:
         store_employees.append(manager_user)
     wh_q = await session.execute(
-        select(User).where(User.role == UserRole.WAREHOUSE_WORKER, User.is_active == True)
+        select(User).where(User.role == UserRole.WAREHOUSE_WORKER, User.is_active == True).order_by(User.name)
     )
     warehouse_employees = wh_q.scalars().all()
     selected_store = [e.user_id for e in record.employees if not e.is_warehouse]
