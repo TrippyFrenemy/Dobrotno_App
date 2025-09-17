@@ -383,7 +383,12 @@ async def create_record(
     store_employees = [int(uid) for uid in store_employees if uid.strip().isdigit()]
     warehouse_employees = [int(uid) for uid in warehouse_employees if uid.strip().isdigit()]
     manager_user = await get_config_manager(session)
-    if manager_user and manager_user.id not in store_employees:
+    is_weekend = date_.weekday() >= 5
+    if (
+        manager_user
+        and manager_user.id not in store_employees
+        and not is_weekend
+    ):
         store_employees.append(manager_user.id)
     
     user_ids = store_employees + warehouse_employees
