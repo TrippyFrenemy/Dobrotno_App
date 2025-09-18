@@ -14,6 +14,8 @@ from src.tiktok.reports.service import get_half_month_periods, get_monthly_repor
 from src.users.models import User
 from src.payouts.models import Location
 
+from src.tasks.reporting import _build_period_for_today, _generate_and_send_reports
+
 router = APIRouter()
 templates = Jinja2Templates(directory="src/templates")
 
@@ -99,3 +101,54 @@ async def make_payout(
     
     return RedirectResponse(f"/reports/monthly?month={date.month}&year={date.year}", status_code=302)
 
+
+@router.get("/telegram", response_class=HTMLResponse)
+async def telegram_report_form(
+    request: Request,
+    start: date | None = Query(None),
+    end: date | None = Query(None),
+    success: bool | None = Query(False),
+    user: User = Depends(get_admin_user),
+):
+    today = date.today()
+    default_period = _build_period_for_today(today) or (today.replace(day=1), today)
+    start_date = start or default_period[0]
+    end_date = end or default_period[1]
+
+    return templates.TemplateResponse(
+        "tiktok/reports/telegram_manual.html",
+        {
+            "request": request,
+            "user": user,
+            "start": start_date,
+            "end": end_date,
+            "success": bool(success),
+        },
+    )
+
+
+@router.post("/telegram", response_class=HTMLResponse)
+async def send_telegram_report(
+    request: Request,
+    start: date = Form(...),
+    end: date = Form(...),
+    user: User = Depends(get_admin_user),
+):
+    if start > end:
+        return templates.TemplateResponse(
+            "tiktok/reports/telegram_manual.html",
+            {
+                "request": request,
+                "user": user,
+                "start": start,
+                "end": end,
+                "error": "Дата начала не может быть позже даты окончания.",
+                "success": False,
+            },
+            status_code=400,
+        )
+
+    await _generate_and_send_reports(start, end)
+
+    redirect_url = f"/reports/telegram?start={start.isoformat()}&end={end.isoformat()}&success=true"
+    return RedirectResponse(redirect_url, status_code=303)
