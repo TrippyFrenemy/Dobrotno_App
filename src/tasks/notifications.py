@@ -95,7 +95,7 @@ async def _send_high_value_order_alert(order_id: int):
         # Получаем заказ
         stmt_order = (
             select(Order)
-            .options(selectinload(Order.creator), selectinload(Order.order_type))
+            .options(selectinload(Order.created_by), selectinload(Order.order_type))
             .where(Order.id == order_id)
         )
         result_order = await session.execute(stmt_order)
@@ -106,7 +106,7 @@ async def _send_high_value_order_alert(order_id: int):
 
         # Получаем всех админов и менеджеров
         stmt_users = select(User.id).where(
-            User.role.in_([UserRole.ADMIN, UserRole.MANAGER]),
+            User.role == UserRole.ADMIN,
             User.is_active == True
         )
         result_users = await session.execute(stmt_users)
@@ -117,7 +117,7 @@ async def _send_high_value_order_alert(order_id: int):
 
         # Формируем сообщение
         type_name = order.order_type.name if order.order_type else "Без типа"
-        creator_name = order.creator.name if order.creator else "Неизвестный"
+        creator_name = order.created_by.name if order.created_by else "Неизвестный"
 
         title = f"💰 Крупный заказ: {order.amount:.0f} грн"
         message = (
@@ -200,7 +200,7 @@ async def _send_weekly_performance_summary():
 
         # Получаем всех активных менеджеров
         stmt_managers = select(User).where(
-            User.role == UserRole.MANAGER,
+            User.role == UserRole.ADMIN,
             User.is_active == True
         )
         result_managers = await session.execute(stmt_managers)
