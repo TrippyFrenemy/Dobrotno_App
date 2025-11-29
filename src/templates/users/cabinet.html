@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Личный кабинет{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">💼 Личный кабинет: {{ user.name | e }}</h2>
+
+<!-- Фильтр периода -->
+<form method="get" class="mb-6 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Показать месяцев</label>
+    <select name="months" class="border p-2 rounded">
+      <option value="1" {% if months == 1 %}selected{% endif %}>1 месяц</option>
+      <option value="3" {% if months == 3 %}selected{% endif %}>3 месяца</option>
+      <option value="6" {% if months == 6 %}selected{% endif %}>6 месяцев</option>
+      <option value="12" {% if months == 12 %}selected{% endif %}>12 месяцев</option>
+    </select>
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+  <a href="/users/me" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Назад к аккаунту</a>
+</form>
+
+<!-- Информация о пользователе -->
+<div class="bg-blue-50 p-4 rounded border border-blue-200 mb-6">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div>
+      <div class="text-sm text-gray-600">Роль</div>
+      <div class="text-lg font-semibold">
+        {% if user.role == 'admin' %}Администратор
+        {% elif user.role == 'manager' %}Менеджер
+        {% else %}Сотрудник{% endif %}
+      </div>
+    </div>
+    {% if user.role in ['manager', 'admin'] %}
+    <div>
+      <div class="text-sm text-gray-600">Ставка</div>
+      <div class="text-lg font-semibold">{{ "%.2f"|format(user.default_rate) }} грн/день</div>
+    </div>
+    <div>
+      <div class="text-sm text-gray-600">Процент</div>
+      <div class="text-lg font-semibold">{{ "%.1f"|format(user.default_percent) }}%</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Зарплата по месяцам -->
+<h3 class="text-xl font-semibold mb-3">💰 Зарплата за последние {{ months }} месяцев</h3>
+<table class="w-full text-sm border mb-8">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Месяц</th>
+      {% if user.role == 'employee' %}
+      <th class="p-2 border">За смены</th>
+      {% else %}
+      <th class="p-2 border">Фиксированная</th>
+      {% endif %}
+      <th class="p-2 border">Штрафы</th>
+      <th class="p-2 border">Итого</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for data in monthly_data %}
+    <tr>
+      <td class="p-2 border font-medium">{{ data.month_name }} {{ data.year }}</td>
+      {% if user.role == 'employee' %}
+      <td class="p-2 border text-right">{{ "%.2f"|format(data.shifts_salary) }} грн</td>
+      {% else %}
+      <td class="p-2 border text-right">{{ "%.2f"|format(data.manager_salary) }} грн</td>
+      {% endif %}
+      <td class="p-2 border text-right {% if data.penalties > 0 %}text-red-600 font-semibold{% endif %}">
+        {% if data.penalties > 0 %}-{% endif %}{{ "%.2f"|format(data.penalties) }} грн
+      </td>
+      <td class="p-2 border text-right font-bold">{{ "%.2f"|format(data.total) }} грн</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot class="bg-gray-50 font-bold">
+    <tr>
+      <td class="p-2 border">Всего:</td>
+      {% if user.role == 'employee' %}
+      <td class="p-2 border text-right">{{ "%.2f"|format(monthly_data|sum(attribute='shifts_salary')) }} грн</td>
+      {% else %}
+      <td class="p-2 border text-right">{{ "%.2f"|format(monthly_data|sum(attribute='manager_salary')) }} грн</td>
+      {% endif %}
+      <td class="p-2 border text-right text-red-600">
+        -{{ "%.2f"|format(monthly_data|sum(attribute='penalties')) }} грн
+      </td>
+      <td class="p-2 border text-right">{{ "%.2f"|format(monthly_data|sum(attribute='total')) }} грн</td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- Последние штрафы -->
+{% if recent_penalties %}
+<h3 class="text-xl font-semibold mb-3">⚠️ Последние штрафы (за 90 дней)</h3>
+<table class="w-full text-sm border">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Дата</th>
+      <th class="p-2 border">Сумма</th>
+      <th class="p-2 border">Причина</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for penalty in recent_penalties %}
+    <tr>
+      <td class="p-2 border">{{ penalty.date | e }}</td>
+      <td class="p-2 border text-right text-red-600 font-semibold">-{{ "%.2f"|format(penalty.amount) }} грн</td>
+      <td class="p-2 border">{{ penalty.reason | e }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="bg-green-50 p-4 rounded border border-green-200 text-center">
+  <p class="text-green-700 font-medium">✅ У вас нет штрафов за последние 90 дней!</p>
+</div>
+{% endif %}
+
+<div class="mt-6">
+  <p class="text-sm text-gray-600">
+    <strong>Примечание:</strong> Для менеджеров и администраторов показана упрощенная калькуляция. Полные данные с учетом комиссии и процентов доступны в месячных отчетах.
+  </p>
+</div>
+
+{% endblock %}

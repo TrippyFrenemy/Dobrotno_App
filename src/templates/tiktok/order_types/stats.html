@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Статистика: {{ order_type.name }}{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">📊 Статистика: {{ order_type.name | e }}</h2>
+
+<!-- Фильтр периода -->
+<form method="get" class="mb-6 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Период (дней)</label>
+    <select name="days" class="border p-2 rounded">
+      <option value="7" {% if days == 7 %}selected{% endif %}>7 дней</option>
+      <option value="14" {% if days == 14 %}selected{% endif %}>14 дней</option>
+      <option value="30" {% if days == 30 %}selected{% endif %}>30 дней</option>
+      <option value="60" {% if days == 60 %}selected{% endif %}>60 дней</option>
+      <option value="90" {% if days == 90 %}selected{% endif %}>90 дней</option>
+      <option value="180" {% if days == 180 %}selected{% endif %}>180 дней</option>
+      <option value="365" {% if days == 365 %}selected{% endif %}>Год</option>
+    </select>
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+  <a href="/order-types/" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Назад к списку</a>
+</form>
+
+<!-- Общая статистика -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-blue-50 p-4 rounded border border-blue-200">
+    <div class="text-sm text-gray-600">Комиссия типа</div>
+    <div class="text-2xl font-bold text-blue-700">{{ "%.0f"|format(order_type.commission_percent) }}%</div>
+  </div>
+  <div class="bg-green-50 p-4 rounded border border-green-200">
+    <div class="text-sm text-gray-600">Всего заказов</div>
+    <div class="text-2xl font-bold text-green-700">{{ total_count }}</div>
+  </div>
+  <div class="bg-purple-50 p-4 rounded border border-purple-200">
+    <div class="text-sm text-gray-600">Общая сумма</div>
+    <div class="text-2xl font-bold text-purple-700">{{ "%.2f"|format(total_amount) }} грн</div>
+  </div>
+  <div class="bg-orange-50 p-4 rounded border border-orange-200">
+    <div class="text-sm text-gray-600">Средний заказ</div>
+    <div class="text-2xl font-bold text-orange-700">{{ "%.2f"|format(avg_amount) }} грн</div>
+  </div>
+</div>
+
+<!-- Статистика по дням -->
+{% if daily_stats %}
+<h3 class="text-xl font-semibold mb-3">📈 Статистика по дням ({{ start_date | e }} — {{ end_date | e }})</h3>
+<table class="w-full text-sm border mb-8">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">Дата</th>
+      <th class="p-2 border">Количество заказов</th>
+      <th class="p-2 border">Сумма</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for day in daily_stats %}
+    <tr>
+      <td class="p-2 border">{{ day.date | e }}</td>
+      <td class="p-2 border text-center">{{ day.count }}</td>
+      <td class="p-2 border text-right">{{ "%.2f"|format(day.amount) }} грн</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="italic text-gray-600 mb-8">Нет данных за выбранный период.</p>
+{% endif %}
+
+<!-- Последние заказы -->
+{% if recent_orders %}
+<h3 class="text-xl font-semibold mb-3">🕒 Последние 20 заказов</h3>
+<table class="w-full text-sm border">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="p-2 border">№</th>
+      <th class="p-2 border">Дата</th>
+      <th class="p-2 border">Телефон</th>
+      <th class="p-2 border">Сумма</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for order in recent_orders %}
+    <tr>
+      <td class="p-2 border">{{ loop.index }}</td>
+      <td class="p-2 border">{{ order.date | e }}</td>
+      <td class="p-2 border">{{ order.phone_number | e }}</td>
+      <td class="p-2 border text-right">{{ order.amount | e }} грн</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="italic text-gray-600">Нет заказов этого типа.</p>
+{% endif %}
+
+{% endblock %}

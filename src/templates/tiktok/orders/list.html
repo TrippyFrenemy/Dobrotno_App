@@ -18,10 +18,23 @@
     <input type="number" name="year" value="{{ year or '' }}" class="border p-2 rounded w-28">
   </div>
   <div>
+    <label class="block text-sm font-medium text-gray-700">Тип заказа</label>
+    <select name="type_id" class="border p-2 rounded">
+      <option value="">Все типы</option>
+      {% for order_type in order_types %}
+      <option value="{{ order_type.id }}" {% if type_id == order_type.id %}selected{% endif %}>{{ order_type.name | e }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
     <label class="block text-sm font-medium text-gray-700">Сортировка</label>
     <select name="sort_by" class="border p-2 rounded">
-      <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>По созданию</option>
-      <option value="date" {% if sort_by == 'date' %}selected{% endif %}>По дате</option>
+      <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>По дате (новые)</option>
+      <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>По дате (старые)</option>
+      <option value="created_at_desc" {% if sort_by == 'created_at_desc' %}selected{% endif %}>По созданию (новые)</option>
+      <option value="created_at_asc" {% if sort_by == 'created_at_asc' %}selected{% endif %}>По созданию (старые)</option>
+      <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>По сумме (больше)</option>
+      <option value="amount_asc" {% if sort_by == 'amount_asc' %}selected{% endif %}>По сумме (меньше)</option>
     </select>
   </div>
   <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
@@ -37,6 +50,7 @@
       <th class="p-2 border">Дата</th>
       <th class="p-2 border">Телефон</th>
       <th class="p-2 border">Сумма</th>
+      <th class="p-2 border">Тип</th>
       {% if user.role == 'admin' %}
       <th class="p-2 border">Создатель</th>
       {% endif %}
@@ -49,7 +63,8 @@
       <td class="p-2 border">{{ loop.index }}</td>
       <td class="p-2 border">{{ order.date | e }}</td>
       <td class="p-2 border">{{ order.phone_number | e }}</td>
-      <td class="p-2 border">{{ order.amount | e }}</td>
+      <td class="p-2 border">{{ order.amount | e }} грн</td>
+      <td class="p-2 border">{{ order.order_type.name | e if order.order_type else "-" }}</td>
       {% if user.role == 'admin' %}
         <td class="p-2 border">{{ order.created_by_user.name | e if order.created_by_user else "-" }}</td>
       {% endif %}

@@ -20,9 +20,11 @@ from src.users.models import User, UserRole
 from src.auth.router import router as auth_router
 from src.users.router import router as users_router
 from src.tiktok.router import router as tiktok_router
+from src.tiktok.order_types.router import router as order_types_router
 from src.cafe.router import router as coffee_router
 from src.logs.router import router as logs_router
 from src.stores.router import router as stores_router
+from src.notifications.router import router as notifications_router
 
 from src.utils.create_preconfig_users import create_user
 from src.config import (
@@ -96,6 +98,12 @@ app.include_router(
 )
 
 app.include_router(
+    router=order_types_router,
+    tags=["OrderTypes"],
+    dependencies=[Depends(get_admin_user)]
+)
+
+app.include_router(
     router=coffee_router,
     prefix="/cafe",
     tags=["Cafe"],
@@ -114,4 +122,9 @@ app.include_router(
     prefix="/logs",
     tags=["Logs"],
     dependencies=[Depends(get_admin_user)]
+)
+
+app.include_router(
+    router=notifications_router,
+    tags=["Notifications"],
 )

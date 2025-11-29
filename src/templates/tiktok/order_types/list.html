@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Типы заказов{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-semibold">Типы заказов</h2>
+    <a href="/order-types/create" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+      + Добавить тип
+    </a>
+  </div>
+
+  {% if order_types %}
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full">
+      <thead class="bg-gray-100 border-b">
+        <tr>
+          <th class="p-4 text-left font-semibold text-gray-700">№</th>
+          <th class="p-4 text-left font-semibold text-gray-700">Название</th>
+          <th class="p-4 text-left font-semibold text-gray-700">Процент комиссии (%)</th>
+          <th class="p-4 text-left font-semibold text-gray-700">Статус</th>
+          <th class="p-4 text-left font-semibold text-gray-700">Действия</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for type in order_types %}
+        <tr class="hover:bg-gray-50">
+          <td class="p-4 text-gray-900">{{ loop.index }}</td>
+          <td class="p-4 font-medium text-gray-900">{{ type.name | e }}</td>
+          <td class="p-4 text-gray-700">{{ type.commission_percent | e }}%</td>
+          <td class="p-4">
+            {% if type.is_active %}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Активен
+              </span>
+            {% else %}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                Неактивен
+              </span>
+            {% endif %}
+          </td>
+          <td class="p-4">
+            <div class="flex gap-2">
+              <a href="/order-types/{{ type.id }}/stats"
+                 class="text-green-600 hover:text-green-800 font-medium">
+                Статистика
+              </a>
+              <a href="/order-types/{{ type.id }}/edit"
+                 class="text-blue-600 hover:text-blue-800 font-medium">
+                Изменить
+              </a>
+              <form method="post" action="/order-types/{{ type.id }}/delete"
+                    onsubmit="return confirm('Деактивировать тип заказа?');"
+                    class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                {% if type.is_active %}
+                  <button type="submit" class="text-red-600 hover:text-red-800 font-medium">
+                    Деактивировать
+                  </button>
+                {% endif %}
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-lg shadow p-8 text-center">
+    <p class="text-gray-600 mb-4">Нет типов заказов</p>
+    <a href="/order-types/create" class="inline-block bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+      Создать первый тип
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="mt-6">
+    <a href="/dashboard" class="text-blue-600 hover:underline">← Назад к дашборду</a>
+  </div>
+</div>
+{% endblock %}

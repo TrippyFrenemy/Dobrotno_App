@@ -58,7 +58,8 @@ async def create_shift(
     if not csrf_token or not await verify_csrf_token(current_user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
-    if abs((date.today() - date_).days) > 14:
+    # Для администраторов нет ограничения по датам, для менеджеров - 14 дней
+    if current_user.role != "admin" and abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата смены должна быть в пределах 14 дней от сегодняшней")
 
     # 🧠 Ограничения

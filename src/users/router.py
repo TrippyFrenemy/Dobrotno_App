@@ -1,17 +1,22 @@
-from datetime import time
+from datetime import time, date, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, extract
 from passlib.context import CryptContext
+from decimal import Decimal
+from collections import defaultdict
 
 from src.auth.dependencies import get_admin_user, get_current_user
 from src.users import schemas
 from src.users.models import User, UserRole
 from src.database import get_async_session
 from sqlalchemy.future import select
+from src.tiktok.returns.models import Return
+from src.tiktok.shifts.models import Shift, ShiftAssignment
 
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
@@ -74,6 +79,126 @@ async def my_account_page(request: Request, user: User = Depends(get_current_use
     result = await session.execute(stmt)
     other_users = result.scalars().all()
     return templates.TemplateResponse("users/me.html", {"request": request, "user": user, "users": other_users})
+
+
+@router.get("/cabinet", response_class=HTMLResponse)
+async def employee_cabinet(
+    request: Request,
+    months: int = Query(3, ge=1, le=12),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Личный кабинет сотрудника с зарплатой и штрафами"""
+
+    # Получаем данные за последние N месяцев
+    monthly_data = []
+    today = date.today()
+
+    for i in range(months):
+        # Вычисляем месяц и год
+        target_date = today - timedelta(days=30 * i)
+        month = target_date.month
+        year = target_date.year
+
+        # Период месяца
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year, 12, 31)
+        else:
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
+
+        # Зарплата за смены (сотрудники)
+        shifts_salary = Decimal('0')
+        if user.role == UserRole.EMPLOYEE:
+            stmt_shifts = (
+                select(ShiftAssignment)
+                .join(Shift)
+                .where(
+                    ShiftAssignment.user_id == user.id,
+                    Shift.date >= start_date,
+                    Shift.date <= end_date
+                )
+            )
+            result_shifts = await session.execute(stmt_shifts)
+            assignments = result_shifts.scalars().all()
+            shifts_salary = sum(a.salary for a in assignments)
+
+        # Штрафы за месяц
+        stmt_returns = (
+            select(Return)
+            .where(
+                Return.date >= start_date,
+                Return.date <= end_date
+            )
+        )
+        result_returns = await session.execute(stmt_returns)
+        all_returns = result_returns.scalars().all()
+
+        penalties = Decimal('0')
+        for ret in all_returns:
+            if ret.penalty_distribution and str(user.id) in ret.penalty_distribution:
+                penalties += Decimal(str(ret.penalty_distribution[str(user.id)]))
+
+        # Для менеджеров/админов - используем данные из отчетов
+        # (упрощенная версия, полные данные в месячных отчетах)
+        manager_salary = Decimal('0')
+        if user.role in [UserRole.MANAGER, UserRole.ADMIN]:
+            # Это упрощенная калькуляция, реальная логика в reports/service.py
+            # Для полной точности нужно использовать get_monthly_report
+            working_days = 0
+            stmt_days = (
+                select(func.count(func.distinct(Shift.date)))
+                .where(
+                    Shift.date >= start_date,
+                    Shift.date <= end_date
+                )
+            )
+            result_days = await session.execute(stmt_days)
+            working_days = result_days.scalar() or 0
+            manager_salary = Decimal(str(user.default_rate)) * working_days
+
+        total_salary = shifts_salary + manager_salary - penalties
+
+        monthly_data.append({
+            "month": month,
+            "year": year,
+            "month_name": ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                          "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"][month],
+            "shifts_salary": shifts_salary,
+            "manager_salary": manager_salary,
+            "penalties": penalties,
+            "total": total_salary,
+        })
+
+    # Последние штрафы
+    stmt_recent_penalties = (
+        select(Return)
+        .where(Return.date >= today - timedelta(days=90))
+        .order_by(Return.date.desc())
+    )
+    result_penalties = await session.execute(stmt_recent_penalties)
+    all_recent_returns = result_penalties.scalars().all()
+
+    recent_penalties = []
+    for ret in all_recent_returns:
+        if ret.penalty_distribution and str(user.id) in ret.penalty_distribution:
+            recent_penalties.append({
+                "date": ret.date,
+                "amount": Decimal(str(ret.penalty_distribution[str(user.id)])),
+                "reason": ret.reason or "Не указана",
+            })
+
+    return templates.TemplateResponse(
+        "users/cabinet.html",
+        {
+            "request": request,
+            "user": user,
+            "months": months,
+            "monthly_data": monthly_data,
+            "recent_penalties": recent_penalties[:10],  # Показываем последние 10
+        },
+    )
+
 
 @router.get("/{user_id}/edit", response_class=HTMLResponse)
 async def edit_user_page(user_id: int, request: Request, session: AsyncSession = Depends(get_async_session), admin: User = Depends(get_admin_user)):

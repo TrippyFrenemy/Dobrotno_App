@@ -2,14 +2,48 @@
 {% block title %}Список возвратов{% endblock %}
 
 {% block content %}
-<h2 class="text-xl font-semibold mb-4">Список возвратов</h2>
+<h2 class="text-2xl font-semibold mb-4">Список возвратов</h2>
+
+<form method="get" class="mb-6 flex gap-4 items-end">
+  <div>
+    <label class="block text-sm font-medium text-gray-700">День</label>
+    <input type="number" name="day" value="{{ day or '' }}" min="1" max="31" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Месяц</label>
+    <input type="number" name="month" value="{{ month or '' }}" min="1" max="12" class="border p-2 rounded w-24">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Год</label>
+    <input type="number" name="year" value="{{ year or '' }}" class="border p-2 rounded w-28">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-gray-700">Сортировка</label>
+    <select name="sort_by" class="border p-2 rounded">
+      <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>По дате (новые)</option>
+      <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>По дате (старые)</option>
+      <option value="created_at_desc" {% if sort_by == 'created_at_desc' %}selected{% endif %}>По созданию (новые)</option>
+      <option value="created_at_asc" {% if sort_by == 'created_at_asc' %}selected{% endif %}>По созданию (старые)</option>
+      <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>По сумме (больше)</option>
+      <option value="amount_asc" {% if sort_by == 'amount_asc' %}selected{% endif %}>По сумме (меньше)</option>
+      <option value="penalty_desc" {% if sort_by == 'penalty_desc' %}selected{% endif %}>По штрафу (больше)</option>
+      <option value="penalty_asc" {% if sort_by == 'penalty_asc' %}selected{% endif %}>По штрафу (меньше)</option>
+    </select>
+  </div>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+</form>
+
 
 {% if returns %}
+<h3 class="text-xl font-semibold mb-3">Результаты</h3>
 <table class="w-full text-sm border">
   <thead class="bg-gray-100">
     <tr>
+      <th class="p-2 border">№</th>
       <th class="p-2 border">Дата</th>
       <th class="p-2 border">Сумма</th>
+      <th class="p-2 border">Штраф</th>
+      <th class="p-2 border">Заказ</th>
       <th class="p-2 border">Причина</th>
       {% if user.role == 'admin' %}
       <th class="p-2 border">Создатель</th>
@@ -20,9 +54,24 @@
   <tbody>
     {% for ret in returns %}
     <tr>
+      <td class="p-2 border">{{ loop.index }}</td>
       <td class="p-2 border">{{ ret.date | e }}</td>
-      <td class="p-2 border">{{ ret.amount | e }}</td>
-      <td class="p-2 border">{{ ret.reason or "-" | e  }}</td>
+      <td class="p-2 border">{{ ret.amount | e }} грн</td>
+      <td class="p-2 border">
+        {% if ret.penalty_amount > 0 %}
+          <span class="text-red-600 font-semibold">{{ ret.penalty_amount | e }} грн</span>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td class="p-2 border">
+        {% if ret.order %}
+          <a href="/orders/{{ ret.order.id }}/edit" class="text-blue-600 hover:underline">#{{ ret.order.id }}</a>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td class="p-2 border">{{ ret.reason or "-" | e }}</td>
       {% if user.role == 'admin' %}
       <td class="p-2 border">{{ ret.created_by_user.name if ret.created_by_user else "-" | e }}</td>
       {% endif %}
@@ -39,6 +88,6 @@
   </tbody>
 </table>
 {% else %}
-<p class="text-gray-600 italic">Нет возвратов.</p>
+<p class="italic text-gray-600">Нет возвратов.</p>
 {% endif %}
 {% endblock %}

@@ -18,6 +18,7 @@ from src.database import async_session_maker
 from src.tiktok.reports.service import (
     get_monthly_report,
     get_payouts_for_period as get_tiktok_payouts,
+    get_weekly_periods,
     summarize_period,
 )
 from src.users.models import User, UserRole
@@ -73,12 +74,35 @@ def _collapse_no_data_days(days_flags: dict[date, bool]) -> str:
 # -------- period selection --------
 
 def _build_period_for_today(today: date) -> tuple[date, date] | None:
-    if today.day >= 15:
-        return today.replace(day=1), today.replace(day=15)
-    if 1 <= today.day <= 14:
+    """
+    Новая логика отправки отчетов:
+    - 8 числа: период 1-7 текущего месяца
+    - 15 числа: период 8-14 текущего месяца
+    - 22 числа: период 15-21 текущего месяца
+    - 1 числа или последнего дня месяца (30/31): период 22-последний день предыдущего месяца
+    """
+    if today.day == 8:
+        # Период 1-7 текущего месяца
+        return today.replace(day=1), today.replace(day=7)
+    elif today.day == 15:
+        # Период 8-14 текущего месяца
+        return today.replace(day=8), today.replace(day=14)
+    elif today.day == 22:
+        # Период 15-21 текущего месяца
+        return today.replace(day=15), today.replace(day=21)
+    elif today.day == 1:
+        # Период 22-конец предыдущего месяца
         first_of_month = today.replace(day=1)
-        previous_day = first_of_month - timedelta(days=1)
-        return previous_day.replace(day=16), previous_day
+        last_day_prev_month = first_of_month - timedelta(days=1)
+        return last_day_prev_month.replace(day=22), last_day_prev_month
+    else:
+        # Проверяем, является ли сегодня последним днем месяца (30 или 31)
+        # Если завтра будет 1-е число, значит сегодня последний день
+        tomorrow = today + timedelta(days=1)
+        if tomorrow.day == 1:
+            # Последний день месяца - отправляем отчет за период 22-конец текущего месяца
+            return today.replace(day=22), today
+
     return None
 
 # -------- db fetch --------

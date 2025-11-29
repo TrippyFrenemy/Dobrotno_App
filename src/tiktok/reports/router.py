@@ -10,7 +10,7 @@ from src.payouts.models import Payout, RoleType
 from src.tiktok.shifts.models import Shift
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
-from src.tiktok.reports.service import get_half_month_periods, get_monthly_report, get_payouts_for_period, summarize_period
+from src.tiktok.reports.service import get_half_month_periods, get_weekly_periods, get_monthly_report, get_payouts_for_period, summarize_period
 from src.users.models import User
 from src.payouts.models import Location
 
@@ -24,6 +24,9 @@ async def monthly_report_page(
     request: Request,
     month: int = Query(None, ge=1, le=12),
     year: int = Query(None),
+    period_mode: str = Query("new", regex="^(old|new|custom)$"),  # new - 4 периода, old - 2 периода, custom - произвольный
+    custom_start: date = Query(None),
+    custom_end: date = Query(None),
     session: AsyncSession = Depends(get_async_session),
     user = Depends(get_manager_or_admin),
 ):
@@ -38,22 +41,82 @@ async def monthly_report_page(
         month = target.month
         year = target.year
 
-    first_half, second_half = get_half_month_periods(month, year)
-
     users_q = await session.execute(select(User))
     users = users_q.scalars().all()
-    
+
     user_map = {u.id: u.name for u in users}
 
-    # Сбор данных за обе половины
-    data_1_15 = await get_monthly_report(session, first_half[0], first_half[1], current_user=user)
-    data_16_31 = await get_monthly_report(session, second_half[0], second_half[1], current_user=user)
+    # Выбор логики периодов
+    if period_mode == "custom":
+        # Произвольный период
+        if not custom_start or not custom_end:
+            # Если даты не указаны, показываем текущий месяц в режиме new
+            period_mode = "new"
+        elif custom_start > custom_end:
+            raise HTTPException(status_code=400, detail="Дата начала не может быть позже даты окончания")
+        else:
+            data_custom = await get_monthly_report(session, custom_start, custom_end, current_user=user)
+            payouts_custom = await get_payouts_for_period(session, custom_start, custom_end, current_user=user)
+            custom_summary = summarize_period(data_custom, payouts_custom)
 
-    payouts_1_15 = await get_payouts_for_period(session, first_half[0], first_half[1], current_user=user)
-    payouts_16_31 = await get_payouts_for_period(session, second_half[0], second_half[1], current_user=user)
+            periods = [
+                (f"{custom_start.day}.{custom_start.month}–{custom_end.day}.{custom_end.month}", custom_summary, (custom_start, custom_end))
+            ]
 
-    first_half_summary = summarize_period(data_1_15, payouts_1_15)
-    second_half_summary = summarize_period(data_16_31, payouts_16_31)
+            return templates.TemplateResponse("tiktok/reports/monthly.html", {
+                "request": request,
+                "user": user,
+                "user_map": user_map,
+                "year": year or custom_start.year,
+                "month": month or custom_start.month,
+                "period_mode": period_mode,
+                "periods": periods,
+                "custom_start": custom_start,
+                "custom_end": custom_end,
+            })
+
+    if period_mode == "old":
+        # Старая логика: 1-15, 16-конец
+        first_half, second_half = get_half_month_periods(month, year)
+
+        data_1_15 = await get_monthly_report(session, first_half[0], first_half[1], current_user=user)
+        data_16_31 = await get_monthly_report(session, second_half[0], second_half[1], current_user=user)
+
+        payouts_1_15 = await get_payouts_for_period(session, first_half[0], first_half[1], current_user=user)
+        payouts_16_31 = await get_payouts_for_period(session, second_half[0], second_half[1], current_user=user)
+
+        first_half_summary = summarize_period(data_1_15, payouts_1_15)
+        second_half_summary = summarize_period(data_16_31, payouts_16_31)
+
+        periods = [
+            ("1–15", first_half_summary, first_half),
+            ("16–конец", second_half_summary, second_half)
+        ]
+    else:
+        # Новая логика: 1-7, 8-14, 15-21, 22-конец
+        period1, period2, period3, period4 = get_weekly_periods(month, year)
+
+        data_1_7 = await get_monthly_report(session, period1[0], period1[1], current_user=user)
+        data_8_14 = await get_monthly_report(session, period2[0], period2[1], current_user=user)
+        data_15_21 = await get_monthly_report(session, period3[0], period3[1], current_user=user)
+        data_22_end = await get_monthly_report(session, period4[0], period4[1], current_user=user)
+
+        payouts_1_7 = await get_payouts_for_period(session, period1[0], period1[1], current_user=user)
+        payouts_8_14 = await get_payouts_for_period(session, period2[0], period2[1], current_user=user)
+        payouts_15_21 = await get_payouts_for_period(session, period3[0], period3[1], current_user=user)
+        payouts_22_end = await get_payouts_for_period(session, period4[0], period4[1], current_user=user)
+
+        period1_summary = summarize_period(data_1_7, payouts_1_7)
+        period2_summary = summarize_period(data_8_14, payouts_8_14)
+        period3_summary = summarize_period(data_15_21, payouts_15_21)
+        period4_summary = summarize_period(data_22_end, payouts_22_end)
+
+        periods = [
+            ("1–7", period1_summary, period1),
+            ("8–14", period2_summary, period2),
+            ("15–21", period3_summary, period3),
+            (f"22–{period4[1].day}", period4_summary, period4)
+        ]
 
     return templates.TemplateResponse("tiktok/reports/monthly.html", {
         "request": request,
@@ -61,10 +124,8 @@ async def monthly_report_page(
         "user_map": user_map,
         "year": year,
         "month": month,
-        "first_half": first_half_summary,
-        "second_half": second_half_summary,
-        "first_half_range": first_half,
-        "second_half_range": second_half,
+        "period_mode": period_mode,
+        "periods": periods,
     })
 
 @router.post("/pay")

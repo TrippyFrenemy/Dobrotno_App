@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Новый тип заказа{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-semibold mb-6">Создать тип заказа</h2>
+
+    <form method="post" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div>
+        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
+          Название <span class="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          required
+          maxlength="100"
+          placeholder="Например: Парфюм, Амазон, Лідл"
+          class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
+      <div>
+        <label for="commission_percent" class="block text-sm font-medium text-gray-700 mb-1">
+          Процент комиссии (%)
+        </label>
+        <input
+          type="number"
+          id="commission_percent"
+          name="commission_percent"
+          step="0.01"
+          min="0"
+          max="100"
+          value="0.00"
+          placeholder="0.00"
+          class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <p class="mt-1 text-sm text-gray-500">
+          Дополнительный процент к зарплате сотрудника за заказы этого типа
+        </p>
+      </div>
+
+      <div class="flex items-center">
+        <input
+          type="checkbox"
+          id="is_active"
+          name="is_active"
+          checked
+          class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+        />
+        <label for="is_active" class="ml-2 text-sm font-medium text-gray-700">
+          Активен (можно назначать на заказы)
+        </label>
+      </div>
+
+      <div class="flex gap-3 pt-4">
+        <button
+          type="submit"
+          class="flex-1 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-medium transition-colors"
+        >
+          Создать
+        </button>
+        <a
+          href="/order-types/"
+          class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 font-medium text-center transition-colors"
+        >
+          Отмена
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <div class="mt-6">
+    <a href="/order-types/" class="text-blue-600 hover:underline">← Назад к списку</a>
+  </div>
+</div>
+{% endblock %}

@@ -3,23 +3,25 @@
 
 {% block content %}
 <div class="max-w-md mx-auto bg-white p-6 rounded shadow">
-  <h2 class="text-xl font-semibold mb-4 text-red-700">Возможный дубликат</h2>
-  <p class="mb-4">Заказ с такими данными уже существует:</p>
-  <ul class="mb-6 text-sm text-gray-800 list-disc list-inside">
-    <li>Телефон: {{ phone_number }}</li>
-    <li>Дата: {{ date_ }}</li>
-    <li>Сумма: {{ amount }}</li>
+  <h2 class="text-xl font-semibold mb-4 text-red-700">⚠️ Возможный дубликат</h2>
+  <p class="mb-2">Заказ с такими данными уже существует:</p>
+  <ul class="mb-4 text-sm text-gray-800 list-disc list-inside bg-yellow-50 p-4 rounded border border-yellow-200">
+    <li>Телефон: <strong>{{ phone_number }}</strong></li>
+    <li>Дата: <strong>{{ date_ }}</strong></li>
+    <li>Сумма: <strong>{{ amount }} грн</strong></li>
+    <li>Создал(а): <strong class="text-blue-700">{{ creator_name }}</strong></li>
   </ul>
-  <p class="mb-6">Вы уверены, что хотите создать такой же заказ?</p>
+  <p class="mb-6 text-gray-700">Вы уверены, что хотите создать такой же заказ?</p>
   <form method="post">
     <input type="hidden" name="phone_number" value="{{ phone_number }}">
     <input type="hidden" name="date_" value="{{ date_ }}">
     <input type="hidden" name="amount" value="{{ amount }}">
+    <input type="hidden" name="type_id" value="{{ type_id }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="confirm" value="yes">
     <div class="flex gap-4">
-      <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">Создать</button>
-      <a href="/tiktok/orders/create" class="text-blue-600 hover:underline py-2 px-4">Отмена</a>
+      <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">Создать дубликат</button>
+      <a href="/orders/create" class="text-blue-600 hover:underline py-2 px-4">Отмена</a>
     </div>
   </form>
 </div>

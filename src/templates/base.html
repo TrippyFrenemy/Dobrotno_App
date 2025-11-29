@@ -19,6 +19,10 @@
                     <a href="/cafe" class="text-gray-600">Кафе</a>
                     <a href="/logs" class="bg-gray-800 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm">Логи</a>
                 {% endif %}
+                <a href="/notifications" class="relative text-gray-600 hover:text-blue-600" title="Уведомления">
+                    <span class="text-xl">🔔</span>
+                    <span id="notification-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center"></span>
+                </a>
                 <a href="/users/me" class="text-blue-600 hover:underline">Мой аккаунт</a>
                 <a href="/auth/logout" class="text-red-500 hover:underline">Выход</a>
             {% endif %}
@@ -76,5 +80,30 @@
         }, 2500);
         // Очистить куку после отображения
         document.cookie = "last_order_info=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+
+    // Обновление счетчика уведомлений
+    async function updateNotificationBadge() {
+        try {
+            const res = await fetch("/notifications/api/unread-count", { credentials: "include" });
+            if (res.ok) {
+                const data = await res.json();
+                const badge = document.getElementById("notification-badge");
+                if (badge && data.unread_count > 0) {
+                    badge.textContent = data.unread_count > 99 ? "99+" : data.unread_count;
+                    badge.classList.remove("hidden");
+                } else if (badge) {
+                    badge.classList.add("hidden");
+                }
+            }
+        } catch (error) {
+            // Игнорируем ошибки для не залогиненных пользователей
+        }
+    }
+
+    // Обновляем счетчик при загрузке страницы и каждую минуту
+    if (document.getElementById("notification-badge")) {
+        updateNotificationBadge();
+        setInterval(updateNotificationBadge, 60_000);
     }
 </script>

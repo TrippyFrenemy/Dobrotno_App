@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import Column, DateTime, Integer, String, Date, Numeric, ForeignKey, Boolean, Time
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from src.database import Base
+from src.database import Base, metadata
 
 
 class Store(Base):

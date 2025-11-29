@@ -28,6 +28,7 @@
         <a href="/orders/{{ user.id }}/list" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📋 Список заказов {{ user.name }}</a>
         {% if user.role == 'admin' %}
         <a href="/orders/all/list" class="w-full text-center rounded-lg bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-900 transition">📋 Список заказов всех пользователей</a>
+        <a href="/order-types/" class="w-full text-center rounded-lg bg-indigo-600 text-white px-5 py-2.5 hover:bg-indigo-700 transition">⚙️ Типы заказов</a>
         {% endif %}
       </div>
     </section>

@@ -14,11 +14,51 @@
     <label class="block text-sm">Год</label>
     <input type="number" name="year" value="{{ year }}" class="border p-2 rounded w-32">
   </div>
+  <input type="hidden" name="period_mode" value="{{ period_mode }}">
   <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
 </form>
 
+<!-- Переключатель режима периодов -->
+<div class="mb-6 flex gap-3 flex-wrap">
+  <a href="?month={{ month }}&year={{ year }}&period_mode=new"
+     class="px-4 py-2 rounded {% if period_mode == 'new' %}bg-green-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+    🆕 Новая логика (1-7, 8-14, 15-21, 22-конец)
+  </a>
+  <a href="?month={{ month }}&year={{ year }}&period_mode=old"
+     class="px-4 py-2 rounded {% if period_mode == 'old' %}bg-green-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+    📅 Старая логика (1-15, 16-конец)
+  </a>
+  <button onclick="toggleCustomPeriod()"
+     class="px-4 py-2 rounded {% if period_mode == 'custom' %}bg-green-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+    📆 Произвольный период
+  </button>
+</div>
+
+<!-- Форма произвольного периода -->
+<div id="customPeriodForm" class="mb-6 p-4 border rounded bg-gray-50 {% if period_mode != 'custom' %}hidden{% endif %}">
+  <form method="get" class="flex gap-4 items-end">
+    <div>
+      <label class="block text-sm font-medium">Дата начала</label>
+      <input type="date" name="custom_start" value="{{ custom_start or '' }}" required class="border p-2 rounded">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Дата окончания</label>
+      <input type="date" name="custom_end" value="{{ custom_end or '' }}" required class="border p-2 rounded">
+    </div>
+    <input type="hidden" name="period_mode" value="custom">
+    <button class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Показать период</button>
+  </form>
+</div>
+
+<script>
+function toggleCustomPeriod() {
+  const form = document.getElementById('customPeriodForm');
+  form.classList.toggle('hidden');
+}
+</script>
+
 <!-- Блок отчёта -->
-{% for title, data, period in [("1–15", first_half, first_half_range), ("16–конец", second_half, second_half_range)] %}
+{% for title, data, period in periods %}
 <h3 class="text-xl font-semibold mt-8 mb-2">🗓 Период: {{ period[0] | e }} — {{ period[1] | e }} ({{ title | e }})</h3>
 
 <table class="w-full text-sm border">
@@ -74,8 +114,54 @@
 </table>
 
 
+<!-- Блок статистики по типам заказов -->
+{% if data.types_breakdown %}
+<h4 class="text-lg font-semibold mt-6 mb-2">📦 Разбивка по типам заказов</h4>
+<table class="w-full text-sm border mb-4">
+  <thead class="bg-gray-50">
+    <tr>
+      <th class="p-2 border">Тип заказа</th>
+      <th class="p-2 border">Сумма</th>
+      <th class="p-2 border">Количество</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for type_item in data.types_breakdown %}
+    <tr>
+      <td class="p-2 border">{{ type_item.type_name | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(type_item.amount) }}</td>
+      <td class="p-2 border">{{ type_item.count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<!-- Блок статистики по менеджерам -->
+{% if data.creators_breakdown %}
+<h4 class="text-lg font-semibold mt-4 mb-2">💼 Касса по менеджерам</h4>
+<table class="w-full text-sm border mb-4">
+  <thead class="bg-gray-50">
+    <tr>
+      <th class="p-2 border">Менеджер</th>
+      <th class="p-2 border">Сумма заказов</th>
+      <th class="p-2 border">Количество</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for creator in data.creators_breakdown %}
+    <tr>
+      <td class="p-2 border">{{ creator.name | e }}</td>
+      <td class="p-2 border">{{ "%.2f"|format(creator.amount) }}</td>
+      <td class="p-2 border">{{ creator.count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
 <!-- Блок по сотрудникам -->
-<h4 class="text-lg font-semibold mt-4">👥 Зарплаты по сотрудникам (ставка + %)</h4>
+<h4 class="text-lg font-semibold mt-4">👥 Зарплаты по сотрудникам (ставка + % - штрафы)</h4>
 
 <table class="w-full text-sm border mb-8">
   <thead class="bg-gray-50">
@@ -83,6 +169,7 @@
         <th class="p-2 border">Сотрудник</th>
         <th class="p-2 border">По ставке</th>
         <th class="p-2 border">Процент</th>
+        <th class="p-2 border">Штрафы</th>
         <th class="p-2 border">Итого</th>
         <th class="p-2 border">Выплачено</th>
         <th class="p-2 border">Осталось</th>
@@ -95,7 +182,10 @@
       <td class="p-2 border">👤 {{ user_map.get(s.user_id, "Неизвестно") | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(s.fixed) }}</td>
       <td class="p-2 border">{{ "%.2f"|format(s.percent) }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(s.total) }}</td>
+      <td class="p-2 border {% if s.penalties > 0 %}text-red-600 font-semibold{% endif %}">
+        {% if s.penalties > 0 %}-{% endif %}{{ "%.2f"|format(s.penalties) }}
+      </td>
+      <td class="p-2 border font-semibold">{{ "%.2f"|format(s.total) }}</td>
       <td class="p-2 border">{{ "%.2f"|format(s.paid) }}</td>
       <td class="p-2 border">{{ "%.2f"|format(s.remaining) }}</td>
       <td class="p-2 border">

@@ -12,6 +12,8 @@ class Order(Base):
     amount = Column(Numeric(10, 2), nullable=False)
     created_at = Column(DateTime, default=datetime.now, server_default=text("now()"))
     created_by = Column(ForeignKey("users.id"))
-    
+    type_id = Column(ForeignKey("order_types.id"), nullable=True)  # Nullable для обратной совместимости
+
     created_by_user = relationship("User", backref="orders", lazy="joined")
+    order_type = relationship("OrderType", backref="orders", lazy="joined")
     

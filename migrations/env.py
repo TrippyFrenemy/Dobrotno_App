@@ -19,6 +19,8 @@ from src.payouts.models import *
 from src.cafe.models import *
 from src.stores.models import *
 from src.logs.models import *
+from src.tiktok.order_types.models import *
+from src.notifications.models import *
 # from src.operations.models import *
 
 # this is the Alembic Config object, which provides
