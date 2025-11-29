@@ -9,7 +9,7 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Дата возврата <span class="text-red-500">*</span></label>
-      <input type="date" name="date_" value="{{ ret.date }}" required class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500" />
+            <input type="date" name="date_" id="returnDate" value="{{ ret.date }}" required class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500" />
     </div>
 
     <div>
@@ -24,10 +24,10 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Связанный заказ (необязательно)</label>
-      <select name="order_id" class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
+      <select name="order_id" id="orderSelect" class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
         <option value="">Не указан</option>
         {% for order in orders %}
-        <option value="{{ order.id }}" {% if ret.order_id == order.id %}selected{% endif %}>
+        <option value="{{ order.id }}" data-order-date="{{ order.date }}" {% if ret.order_id == order.id %}selected{% endif %}>
           Заказ #{{ order.id }} - {{ order.date }} - {{ order.phone_number }} - {{ order.amount }} грн ({{ order.created_by_user.name }})
         </option>
         {% endfor %}
@@ -70,28 +70,42 @@ document.addEventListener("DOMContentLoaded", () => {
   const requiredStar = document.getElementById("requiredStar");
   const form = document.getElementById("returnForm");
   const errorMessage = document.getElementById("errorMessage");
+  const returnDateInput = document.getElementById("returnDate");
+  const orderSelect = document.getElementById("orderSelect");
+  
+  // Сохраняем все опции заказов
+  const allOrderOptions = Array.from(orderSelect.options).slice(1); // Убираем первую опцию "Не указан"
 
-  // Показываем звёздочку "обязательно", если штраф > 0
-  penaltyInput.addEventListener("input", () => {
-    const penalty = parseFloat(penaltyInput.value) || 0;
-    if (penalty > 0) {
-      requiredStar.classList.remove("hidden");
-    } else {
-      requiredStar.classList.add("hidden");
+  // Фильтрация заказов по выбранной дате
+  returnDateInput.addEventListener("change", () => {
+    const selectedDate = returnDateInput.value;
+
+    // Удаляем все опции кроме первой ("Не указан")
+    while (orderSelect.options.length > 1) {
+      orderSelect.remove(1);
     }
-  });
 
-  // Валидация формы
-  form.addEventListener("submit", (e) => {
-    const penalty = parseFloat(penaltyInput.value) || 0;
-    const checkboxes = document.querySelectorAll('.employee-checkbox:checked');
+    if (selectedDate) {
+      // Добавляем только заказы с выбранной датой
+      allOrderOptions.forEach(option => {
+        if (option.dataset.orderDate === selectedDate) {
+          orderSelect.appendChild(option.cloneNode(true));
+        }
+      });
 
-    if (penalty > 0 && checkboxes.length === 0) {
-      e.preventDefault();
-      errorMessage.classList.remove("hidden");
-      setTimeout(() => {
-        errorMessage.classList.add("hidden");
-      }, 5000);
+      // Если нет заказов на эту дату, показываем сообщение
+      if (orderSelect.options.length === 1) {
+        const noOrdersOption = document.createElement('option');
+        noOrdersOption.value = '';
+        noOrdersOption.textContent = 'Нет заказов на эту дату';
+        noOrdersOption.disabled = true;
+        orderSelect.appendChild(noOrdersOption);
+      }
+    } else {
+      // Если дата не выбрана, показываем все заказы
+      allOrderOptions.forEach(option => {
+        orderSelect.appendChild(option.cloneNode(true));
+      });
     }
   });
 });

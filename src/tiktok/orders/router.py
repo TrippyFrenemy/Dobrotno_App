@@ -62,19 +62,25 @@ async def create_order(
         Order.phone_number == phone_number,
         Order.date == date_,
         Order.amount == amount
-    ).options(joinedload(Order.created_by_user))
+    ).options(joinedload(Order.created_by_user)).limit(1)
     result = await session.execute(stmt)
-    existing_order = result.scalar_one_or_none()
+    existing_order = result.scalars().first()
 
     if existing_order and confirm != "yes":
         # Показываем страницу с подтверждением с именем создателя
         creator_name = existing_order.created_by_user.name if existing_order.created_by_user else "Неизвестный"
+        
+        # Загружаем тип заказа для отображения
+        order_type = await session.get(OrderType, type_id)
+        type_name = order_type.name if order_type else "Неизвестный тип"
+ 
         return templates.TemplateResponse("tiktok/orders/confirm_duplicate.html", {
             "request": request,
             "phone_number": phone_number,
             "date_": date_.isoformat(),
             "amount": amount,
             "type_id": type_id,
+            "type_name": type_name,
             "creator_name": creator_name,
             "csrf_token": await generate_csrf_token(user.id),
         })

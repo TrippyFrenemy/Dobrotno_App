@@ -221,7 +221,10 @@ async def edit_return_page(
     orders = result_orders.scalars().all()
 
     # Загружаем сотрудников для назначения штрафов
-    stmt_users = select(User).where(User.is_active == True).order_by(User.name)
+    stmt_users = select(User).where(
+        User.is_active == True,
+        User.role == UserRole.EMPLOYEE
+    ).order_by(User.name)
     result_users = await session.execute(stmt_users)
     employees = result_users.scalars().all()
 
@@ -270,7 +273,10 @@ async def update_return(
     # Строим penalty_distribution: делим штраф поровну между выбранными сотрудниками
     penalty_distribution = {}
     if penalty_amount > 0 and selected_employees:
-        penalty_per_employee = penalty_amount / len(selected_employees)
+        penalty_per_employee = (penalty_amount / len(selected_employees)).quantize(
+            Decimal('0.01'),
+            rounding=ROUND_CEILING
+        )
         for emp_id in selected_employees:
             penalty_distribution[str(emp_id)] = float(penalty_per_employee)
 

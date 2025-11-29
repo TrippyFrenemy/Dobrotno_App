@@ -78,15 +78,15 @@ async def get_monthly_report(
 
     # Группируем возвраты по дате
     returns_map = defaultdict(Decimal)
-    penalties_map = defaultdict(lambda: Decimal('0'))  # penalties_map[user_id] = total_penalty
+    penalties_map_by_date = defaultdict(lambda: defaultdict(lambda: Decimal('0')))
 
     for ret in all_returns:
         returns_map[ret.date] += ret.amount
 
-        # Собираем штрафы по сотрудникам
+        # Собираем штрафы по сотрудникам (штрафы привязаны к дате возврата)
         if ret.penalty_distribution:
             for user_id_str, penalty_amount in ret.penalty_distribution.items():
-                penalties_map[int(user_id_str)] += Decimal(str(penalty_amount))
+                penalties_map_by_date[ret.date][int(user_id_str)] += Decimal(str(penalty_amount))
 
     # Все смены с назначениями
     shifts_q = await session.execute(
@@ -111,23 +111,26 @@ async def get_monthly_report(
 
         # Статистика по типам заказов
         orders_by_type = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
-        for uid, order_data in day_orders.items():
-            for order in order_data['orders']:
-                type_id = order.type_id
-                type_name = order_types[type_id].name if type_id and type_id in order_types else "Без типа"
-                orders_by_type[type_name]['amount'] += order.amount
-                orders_by_type[type_name]['count'] += 1
+        if current_user.role != UserRole.MANAGER:
+            for uid, order_data in day_orders.items():
+                for order in order_data['orders']:
+                    type_id = order.type_id
+                    type_name = order_types[type_id].name if type_id and type_id in order_types else "Без типа"
+                    orders_by_type[type_name]['amount'] += order.amount
+                    orders_by_type[type_name]['count'] += 1
 
         # Статистика по создателям (менеджерам)
+        # Для MANAGER этот блок скрываем полностью (таблица "💼 Касса по менеджерам" не отображается).
         orders_by_creator = {}
-        for uid, order_data in day_orders.items():
-            user = users.get(uid)
-            if user:
-                orders_by_creator[uid] = {
-                    'name': user.name,
-                    'amount': order_data['amount'],
-                    'count': len(order_data['orders'])
-                }
+        if current_user.role != UserRole.MANAGER:
+            for uid, order_data in day_orders.items():
+                user = users.get(uid)
+                if user:
+                    orders_by_creator[uid] = {
+                        'name': user.name,
+                        'amount': order_data['amount'],
+                        'count': len(order_data['orders'])
+                    }
 
         fixed = defaultdict(Decimal)
         percent = defaultdict(Decimal)
@@ -206,12 +209,14 @@ async def get_monthly_report(
         salary_percent_by_user = {}
         penalties_by_user = {}
 
-        for uid in set(fixed) | set(percent):
+        day_penalties = penalties_map_by_date.get(current, {})
+
+        for uid in set(fixed) | set(percent) | set(day_penalties):
             if current_user.role == UserRole.MANAGER and users.get(uid) and users.get(uid).role == UserRole.ADMIN:
                 continue
 
             # Вычитаем штрафы из зарплаты
-            penalty = penalties_map.get(uid, Decimal('0'))
+            penalty = day_penalties.get(uid, Decimal('0'))
             total_salary = fixed[uid] + percent[uid] - penalty
 
             salary_by_user[uid] = total_salary
