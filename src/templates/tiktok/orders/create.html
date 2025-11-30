@@ -84,7 +84,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById('addTypeBtn').addEventListener('click', addOrderType);
 
   // Total amount change handler
-  document.getElementById('totalAmount').addEventListener('input', updateAmountValidation);
+  document.getElementById('totalAmount').addEventListener('input', () => {
+    autoFillFirstTypeAmount();
+    updateAmountValidation();
+  });
 
   form.addEventListener("submit", (e) => {
     const rawValue = phoneInput.inputmask.test(phoneInput.value);
@@ -103,21 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    // Validate and prepare order types JSON
-    const orderTypesData = [];
-    const rows = document.querySelectorAll('.order-type-row');
-
-    for (const row of rows) {
-      const typeSelect = row.querySelector('.type-select');
-      const amountInput = row.querySelector('.amount-input');
-
-      if (typeSelect && amountInput && typeSelect.value && amountInput.value) {
-        orderTypesData.push({
-          order_type_id: parseInt(typeSelect.value),
-          amount: parseFloat(amountInput.value)
-        });
-      }
-    }
+    const orderTypesData = buildOrderTypesData();
 
     if (orderTypesData.length === 0) {
       e.preventDefault();
@@ -154,7 +143,10 @@ function addOrderType() {
   const amountInput = row.querySelector('.amount-input');
   const removeBtn = row.querySelector('.remove-type-btn');
 
-  if (typeSelect) typeSelect.addEventListener('change', updateAmountValidation);
+  if (typeSelect) typeSelect.addEventListener('change', () => {
+    autoFillFirstTypeAmount();
+    updateAmountValidation();
+  });
   if (amountInput) amountInput.addEventListener('input', updateAmountValidation);
   if (removeBtn) {
     removeBtn.addEventListener('click', () => {
@@ -162,19 +154,29 @@ function addOrderType() {
       updateAmountValidation();
     });
   }
+
+  updateAmountValidation();
+}
+
+function autoFillFirstTypeAmount() {
+  const rows = document.querySelectorAll('.order-type-row');
+  if (rows.length !== 1) return;
+
+  const totalAmount = document.getElementById('totalAmount').value;
+  const firstAmountInput = rows[0].querySelector('.amount-input');
+
+  if (firstAmountInput) {
+    firstAmountInput.value = totalAmount;
+  }
 }
 
 function updateAmountValidation() {
   const totalAmount = parseFloat(document.getElementById('totalAmount').value) || 0;
-  const rows = document.querySelectorAll('.order-type-row');
+  const orderTypesData = buildOrderTypesData();
+  const distributedAmount = orderTypesData.reduce((sum, ot) => sum + (ot.amount || 0), 0);
 
-  let distributedAmount = 0;
-  for (const row of rows) {
-    const amountInput = row.querySelector('.amount-input');
-    if (amountInput && amountInput.value) {
-      distributedAmount += parseFloat(amountInput.value) || 0;
-    }
-  }
+  const orderTypesInput = document.getElementById('orderTypesInput');
+  orderTypesInput.value = orderTypesData.length ? JSON.stringify(orderTypesData) : '';
 
   document.getElementById('totalAmountDisplay').textContent = totalAmount.toFixed(2);
   document.getElementById('distributedAmount').textContent = distributedAmount.toFixed(2);
@@ -192,6 +194,33 @@ function updateAmountValidation() {
     submitBtn.disabled = false;
     submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
   }
+}
+
+function buildOrderTypesData() {
+  const data = [];
+  const rows = document.querySelectorAll('.order-type-row');
+
+  for (const row of rows) {
+    const typeSelect = row.querySelector('.type-select');
+    const amountInput = row.querySelector('.amount-input');
+
+    if (!typeSelect || !amountInput) continue;
+
+    const typeValue = typeSelect.value;
+    const amountValue = amountInput.value;
+
+    if (typeValue && amountValue !== '') {
+      const parsedAmount = parseFloat(amountValue);
+      if (!isNaN(parsedAmount)) {
+        data.push({
+          order_type_id: parseInt(typeValue),
+          amount: parsedAmount,
+        });
+      }
+    }
+  }
+
+  return data;
 }
 
 document.addEventListener("DOMContentLoaded", () => {

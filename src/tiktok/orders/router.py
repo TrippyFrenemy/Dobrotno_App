@@ -56,6 +56,9 @@ async def create_order_endpoint(
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
+    if not order_types_json or not order_types_json.strip():
+        raise HTTPException(status_code=400, detail="Order types are required")
+
     # Parse order types from JSON
     try:
         order_types_data = json.loads(order_types_json)
@@ -311,6 +314,9 @@ async def update_order_endpoint(
     # Для администраторов нет ограничения по датам, для менеджеров - 14 дней
     if user.role != "admin" and abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
+
+    if not order_types_json or not order_types_json.strip():
+        raise HTTPException(status_code=400, detail="Order types are required")
 
     # Parse order types from JSON
     try:
