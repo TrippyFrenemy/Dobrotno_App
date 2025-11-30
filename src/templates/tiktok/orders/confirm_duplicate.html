@@ -2,27 +2,112 @@
 {% block title %}Подтверждение заказа{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto bg-white p-6 rounded shadow">
-  <h2 class="text-xl font-semibold mb-4 text-red-700">⚠️ Возможный дубликат</h2>
-  <p class="mb-2">Заказ с такими данными уже существует:</p>
-  <ul class="mb-4 text-sm text-gray-800 list-disc list-inside bg-yellow-50 p-4 rounded border border-yellow-200">
-    <li>Телефон: <strong>{{ phone_number }}</strong></li>
-    <li>Дата: <strong>{{ date_ }}</strong></li>
-    <li>Сумма: <strong>{{ amount }} грн</strong></li>
-    <li>Тип заказа: <strong>{{ type_name }}</strong></li>
-    <li>Создал(а): <strong class="text-blue-700">{{ creator_name }}</strong></li>
-  </ul>
-  <p class="mb-6 text-gray-700">Вы уверены, что хотите создать такой же заказ?</p>
-  <form method="post">
+<div class="max-w-2xl mx-auto bg-white p-6 rounded shadow">
+  <h2 class="text-2xl font-semibold mb-4">Проверка дубликатов</h2>
+
+  <!-- Exact Duplicate Warning -->
+  {% if exact_duplicate %}
+  <div class="mb-6 bg-red-50 border-2 border-red-500 rounded-lg p-4">
+    <h3 class="text-lg font-bold text-red-700 mb-3">⛔ ВНИМАНИЕ: Точный дубликат!</h3>
+    <p class="text-red-800 mb-3">Найден идентичный заказ с такими же типами и суммами:</p>
+    <div class="bg-white rounded p-4 mb-3">
+      <ul class="text-sm text-gray-800 space-y-1">
+        <li><strong>Телефон:</strong> {{ phone_number }}</li>
+        <li><strong>Дата:</strong> {{ date_ }}</li>
+        <li><strong>Сумма:</strong> {{ amount }} грн</li>
+        <li><strong>Типы заказа:</strong></li>
+        <ul class="ml-6 mt-1 list-disc">
+          {% if exact_duplicate.is_legacy_order %}
+            <li>{{ exact_duplicate.order_type.name }}: {{ exact_duplicate.amount }} грн</li>
+          {% else %}
+            {% for oot in exact_duplicate.order_types_detail %}
+              <li>{{ oot.order_type.name }}: {{ oot.amount }} грн</li>
+            {% endfor %}
+          {% endif %}
+        </ul>
+        <li><strong>Создал(а):</strong> <span class="text-blue-700">{{ exact_duplicate.created_by_user.name }}</span></li>
+        <li><strong>Создан:</strong> {{ exact_duplicate.created_at.strftime('%d.%m.%Y %H:%M') }}</li>
+      </ul>
+    </div>
+    <p class="text-red-800 font-semibold">Вы действительно хотите создать дубликат?</p>
+  </div>
+  {% endif %}
+
+  <!-- Similar Orders Warning -->
+  {% if similar_orders %}
+  <div class="mb-6 bg-yellow-50 border-2 border-yellow-500 rounded-lg p-4">
+    <h3 class="text-lg font-bold text-yellow-700 mb-3">⚠️ Найдены похожие заказы</h3>
+    <p class="text-yellow-800 mb-3">Заказы с той же суммой и датой, но другими типами:</p>
+
+    {% for order in similar_orders %}
+    <div class="bg-white rounded p-4 mb-3">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <h4 class="font-semibold text-gray-700 mb-2">Существующий заказ:</h4>
+          <ul class="text-sm space-y-1">
+            {% if order.is_legacy_order %}
+              <li>{{ order.order_type.name }}: {{ order.amount }} грн</li>
+            {% else %}
+              {% for oot in order.order_types_detail %}
+                <li>{{ oot.order_type.name }}: {{ oot.amount }} грн</li>
+              {% endfor %}
+            {% endif %}
+          </ul>
+          <p class="text-xs text-gray-600 mt-2">Создал: {{ order.created_by_user.name }}</p>
+          <p class="text-xs text-gray-600">{{ order.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+        </div>
+        <div class="border-l-2 border-gray-200 pl-4">
+          <h4 class="font-semibold text-gray-700 mb-2">Новый заказ:</h4>
+          <ul class="text-sm space-y-1">
+            {% for ot in new_order_types %}
+              <li>{{ ot.type_name }}: {{ ot.amount }} грн</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- New Order Summary -->
+  <div class="mb-6 bg-blue-50 border border-blue-300 rounded-lg p-4">
+    <h3 class="text-lg font-semibold text-blue-700 mb-2">Данные нового заказа:</h3>
+    <ul class="text-sm text-gray-800 space-y-1">
+      <li><strong>Телефон:</strong> {{ phone_number }}</li>
+      <li><strong>Дата:</strong> {{ date_ }}</li>
+      <li><strong>Сумма:</strong> {{ amount }} грн</li>
+      <li><strong>Типы:</strong></li>
+      <ul class="ml-6 mt-1 list-disc">
+        {% for ot in new_order_types %}
+          <li>{{ ot.type_name }}: {{ ot.amount }} грн</li>
+        {% endfor %}
+      </ul>
+    </ul>
+  </div>
+
+  <!-- Confirmation Form -->
+  <form method="post" action="/orders/create">
     <input type="hidden" name="phone_number" value="{{ phone_number }}">
     <input type="hidden" name="date_" value="{{ date_ }}">
     <input type="hidden" name="amount" value="{{ amount }}">
-    <input type="hidden" name="type_id" value="{{ type_id }}">
+    <input type="hidden" name="order_types" value="{{ order_types_json }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="confirm" value="yes">
+
     <div class="flex gap-4">
-      <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">Создать дубликат</button>
-      <a href="/orders/create" class="text-blue-600 hover:underline py-2 px-4">Отмена</a>
+      {% if exact_duplicate %}
+      <button type="submit" class="bg-orange-600 text-white py-2 px-4 rounded hover:bg-orange-700 font-semibold">
+        Да, создать дубликат
+      </button>
+      {% else %}
+      <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">
+        Создать заказ
+      </button>
+      {% endif %}
+      <a href="/orders/create" class="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600">
+        Отмена
+      </a>
     </div>
   </form>
 </div>

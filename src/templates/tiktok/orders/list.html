@@ -64,7 +64,19 @@
       <td class="p-2 border">{{ order.date | e }}</td>
       <td class="p-2 border">{{ order.phone_number | e }}</td>
       <td class="p-2 border">{{ order.amount | e }} грн</td>
-      <td class="p-2 border">{{ order.order_type.name | e if order.order_type else "-" }}</td>
+      <td class="p-2 border">
+        {% if order.is_legacy_order %}
+          <span class="inline-block bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">
+            {{ order.order_type.name | e if order.order_type else "-" }}
+          </span>
+        {% else %}
+          {% for oot in order.order_types_detail %}
+            <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mb-1" title="{{ oot.amount }} грн ({{ oot.order_type.commission_percent }}% комиссия)">
+              {{ oot.order_type.name | e }}: {{ oot.amount }} грн
+            </span>
+          {% endfor %}
+        {% endif %}
+      </td>
       {% if user.role == 'admin' %}
         <td class="p-2 border">{{ order.created_by_user.name | e if order.created_by_user else "-" }}</td>
       {% endif %}

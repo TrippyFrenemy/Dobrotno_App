@@ -7,11 +7,14 @@ from sqlalchemy import and_, delete, extract, insert, select
 from sqlalchemy.orm import joinedload
 from datetime import date, datetime
 from decimal import Decimal
+import json
 
 from src.tiktok.shifts.models import Shift
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
-from src.tiktok.orders.models import Order
+from src.tiktok.orders.models import Order, OrderOrderType
+from src.tiktok.orders.schemas import OrderCreate, OrderTypeItem
+from src.tiktok.orders import service as order_service
 from src.tiktok.order_types.models import OrderType
 from src.users.models import User
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
@@ -39,12 +42,12 @@ async def create_order_page(
     })
 
 @router.post("/create")
-async def create_order(
+async def create_order_endpoint(
     request: Request,
     phone_number: str = Form(...),
     date_: date = Form(...),
     amount: Decimal = Form(...),
-    type_id: int = Form(...),
+    order_types_json: str = Form(..., alias="order_types"),  # JSON string from form
     csrf_token: str = Form(...),
     confirm: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_async_session),
@@ -53,49 +56,78 @@ async def create_order(
     if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
+    # Parse order types from JSON
+    try:
+        order_types_data = json.loads(order_types_json)
+        order_types = [OrderTypeItem(**ot) for ot in order_types_data]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid order types data: {str(e)}")
+
+    # Validate using schema
+    try:
+        order_data = OrderCreate(
+            phone_number=phone_number,
+            date=date_,
+            amount=amount,
+            order_types=order_types
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Для администраторов нет ограничения по датам, для менеджеров - 14 дней
     if user.role != "admin" and abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
 
-    # 🔹 Проверка дубликатов (показываем всем менеджерам и админам)
-    stmt = select(Order).where(
-        Order.phone_number == phone_number,
-        Order.date == date_,
-        Order.amount == amount
-    ).options(joinedload(Order.created_by_user)).limit(1)
-    result = await session.execute(stmt)
-    existing_order = result.scalars().first()
+    # Check for duplicates
+    duplicates = await order_service.check_duplicates(
+        session=session,
+        phone_number=phone_number,
+        date_=date_,
+        amount=amount,
+        order_types=order_types
+    )
 
-    if existing_order and confirm != "yes":
-        # Показываем страницу с подтверждением с именем создателя
-        creator_name = existing_order.created_by_user.name if existing_order.created_by_user else "Неизвестный"
-        
-        # Загружаем тип заказа для отображения
-        order_type = await session.get(OrderType, type_id)
-        type_name = order_type.name if order_type else "Неизвестный тип"
- 
+    # If duplicates found and not confirmed, show confirmation page
+    if (duplicates["exact_duplicate"] or duplicates["similar_orders"]) and confirm != "yes":
+        # Load order type names for display
+        type_ids = [ot.order_type_id for ot in order_types]
+        stmt = select(OrderType).where(OrderType.id.in_(type_ids))
+        result = await session.execute(stmt)
+        types_dict = {ot.id: ot for ot in result.scalars().all()}
+
+        # Prepare new order types for display
+        new_order_types = [
+            {
+                "order_type_id": ot.order_type_id,
+                "amount": ot.amount,
+                "type_name": types_dict[ot.order_type_id].name if ot.order_type_id in types_dict else "Unknown"
+            }
+            for ot in order_types
+        ]
+
         return templates.TemplateResponse("tiktok/orders/confirm_duplicate.html", {
             "request": request,
             "phone_number": phone_number,
             "date_": date_.isoformat(),
             "amount": amount,
-            "type_id": type_id,
-            "type_name": type_name,
-            "creator_name": creator_name,
+            "order_types_json": order_types_json,
+            "new_order_types": new_order_types,
+            "exact_duplicate": duplicates["exact_duplicate"],
+            "similar_orders": duplicates["similar_orders"],
             "csrf_token": await generate_csrf_token(user.id),
         })
 
-    # 🔹 Создание заказа
-    stmt = insert(Order).values(
-        phone_number=phone_number,
-        date=date_,
-        amount=amount,
-        type_id=type_id,
-        created_by=user.id
-    )
-    await session.execute(stmt)
-    await session.commit()
+    # Create order
+    try:
+        new_order = await order_service.create_order(
+            session=session,
+            order_data=order_data,
+            user_id=user.id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
+    # Check if shift exists for this date
     result = await session.execute(select(Shift).where(Shift.date == date_))
     shift = result.scalar_one_or_none()
     if not shift:
@@ -263,12 +295,12 @@ async def edit_order_page(
 
 
 @router.post("/{order_id}/edit", response_class=RedirectResponse)
-async def update_order(
+async def update_order_endpoint(
     order_id: int,
     phone_number: str = Form(...),
     date_: date = Form(...),
     amount: Decimal = Form(...),
-    type_id: int = Form(...),
+    order_types_json: str = Form(..., alias="order_types"),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
@@ -280,15 +312,37 @@ async def update_order(
     if user.role != "admin" and abs((date.today() - date_).days) > 14:
         raise HTTPException(status_code=400, detail="Дата заказа должна быть в пределах 14 дней от сегодняшней")
 
-    order = await session.get(Order, order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
+    # Parse order types from JSON
+    try:
+        order_types_data = json.loads(order_types_json)
+        order_types = [OrderTypeItem(**ot) for ot in order_types_data]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid order types data: {str(e)}")
 
-    order.phone_number = phone_number
-    order.date = date_
-    order.amount = amount
-    order.type_id = type_id
-    await session.commit()
+    # Validate using schema
+    try:
+        order_data = OrderCreate(
+            phone_number=phone_number,
+            date=date_,
+            amount=amount,
+            order_types=order_types
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Update order
+    try:
+        await order_service.update_order(
+            session=session,
+            order_id=order_id,
+            phone_number=phone_number,
+            date_=date_,
+            amount=amount,
+            order_types=order_types
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
     if user.role == "admin":
         return RedirectResponse(url="/orders/all/list", status_code=302)
     else:
@@ -307,4 +361,3 @@ async def delete_order(
     if user.role == "admin":
         return RedirectResponse("/orders/all/list", status_code=302)
     return RedirectResponse(f"/orders/{user.id}/list", status_code=302)
-

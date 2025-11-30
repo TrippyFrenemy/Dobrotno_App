@@ -6,27 +6,41 @@
 {% block content %}
 <div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
   <h2 class="text-xl font-semibold mb-4">Редактировать заказ #{{ order.id | e }}</h2>
-  <form method="post" class="flex flex-col gap-4">
+  <form method="post" id="orderForm" class="flex flex-col gap-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        Тип заказа <span class="text-red-500">*</span>
-      </label>
-      <select name="type_id" required class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
-        <option value="">Выберите тип заказа</option>
-        {% for type in order_types %}
-        <option value="{{ type.id }}" {% if order.type_id == type.id %}selected{% endif %}>
-          {{ type.name | e }}
-        </option>
-        {% endfor %}
-      </select>
-    </div>
+    <input type="hidden" name="order_types" id="orderTypesInput" value="">
 
     <input type="text" name="phone_number" value="{{ order.phone_number }}" required class="border p-2 rounded" />
     <input type="date" name="date_" value="{{ order.date }}" required class="border p-2 rounded" />
-    <input type="number" step="0.01" name="amount" value="{{ order.amount }}" required class="border p-2 rounded" />
-    <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Общая сумма заказа (грн) <span class="text-red-500">*</span>
+      </label>
+      <input type="number" step="0.01" name="amount" id="totalAmount" value="{{ order.amount }}" placeholder="Общая сумма" required class="border p-2 rounded" />
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Типы заказа <span class="text-red-500">*</span>
+      </label>
+      <div id="orderTypesContainer" class="flex flex-col gap-2"></div>
+      <button type="button" id="addTypeBtn" class="mt-2 bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600 text-sm">
+        + Добавить тип
+      </button>
+      <div class="mt-2 text-sm">
+        <span class="text-gray-600">Распределено: </span>
+        <span id="distributedAmount" class="font-semibold">0.00</span>
+        <span class="text-gray-600"> грн из </span>
+        <span id="totalAmountDisplay" class="font-semibold">0.00</span>
+        <span class="text-gray-600"> грн</span>
+        <div id="sumWarning" class="text-red-600 font-medium mt-1 hidden">
+          ⚠️ Сумма типов не совпадает с общей суммой!
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" id="submitBtn" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
   </form>
 </div>
 
@@ -35,15 +49,50 @@
 </div>
 
 <script>
+// Order types data from backend
+const availableOrderTypes = [
+  {% for type in order_types %}
+  { id: {{ type.id }}, name: "{{ type.name | e }}", commission: {{ type.commission_percent }} },
+  {% endfor %}
+];
+
+// Existing order types
+const existingOrderTypes = [
+  {% if order.is_legacy_order %}
+    {% if order.type_id %}
+    { order_type_id: {{ order.type_id }}, amount: {{ order.amount }} },
+    {% endif %}
+  {% else %}
+    {% for oot in order.order_types_detail %}
+    { order_type_id: {{ oot.order_type_id }}, amount: {{ oot.amount }} },
+    {% endfor %}
+  {% endif %}
+];
+
+let typeCounter = 0;
+
 document.addEventListener("DOMContentLoaded", () => {
   const phoneInput = document.querySelector('input[name="phone_number"]');
-  const form = phoneInput.closest("form");
+  const form = document.getElementById("orderForm");
 
   const im = new Inputmask("38099-999-99-99", {
     placeholder: "_",
     showMaskOnHover: false,
   });
   im.mask(phoneInput);
+
+  // Load existing order types or add one empty type
+  if (existingOrderTypes.length > 0) {
+    existingOrderTypes.forEach(ot => addOrderType(ot.order_type_id, ot.amount));
+  } else {
+    addOrderType();
+  }
+
+  // Add type button handler
+  document.getElementById('addTypeBtn').addEventListener('click', () => addOrderType());
+
+  // Total amount change handler
+  document.getElementById('totalAmount').addEventListener('input', updateAmountValidation);
 
   form.addEventListener("submit", (e) => {
     const rawValue = phoneInput.inputmask.test(phoneInput.value);
@@ -59,8 +108,101 @@ document.addEventListener("DOMContentLoaded", () => {
         toast.classList.add("hidden");
         toast.classList.remove("block");
         }, 3000);
+        return;
     }
-    });
+
+    // Validate and prepare order types JSON
+    const orderTypesData = [];
+    const rows = document.querySelectorAll('.order-type-row');
+
+    for (const row of rows) {
+      const typeSelect = row.querySelector('.type-select');
+      const amountInput = row.querySelector('.amount-input');
+
+      if (typeSelect && amountInput && typeSelect.value && amountInput.value) {
+        orderTypesData.push({
+          order_type_id: parseInt(typeSelect.value),
+          amount: parseFloat(amountInput.value)
+        });
+      }
+    }
+
+    if (orderTypesData.length === 0) {
+      e.preventDefault();
+      alert('Добавьте хотя бы один тип заказа');
+      return;
+    }
+
+    // Set JSON to hidden input
+    document.getElementById('orderTypesInput').value = JSON.stringify(orderTypesData);
+  });
+
+  // Initial validation
+  updateAmountValidation();
 });
+
+function addOrderType(selectedTypeId = null, amount = null) {
+  const container = document.getElementById('orderTypesContainer');
+  const index = typeCounter++;
+
+  const row = document.createElement('div');
+  row.className = 'order-type-row flex gap-2 items-center';
+  row.dataset.index = index;
+
+  row.innerHTML = `
+    <select class="type-select flex-1 border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500" required>
+      <option value="">-- Выберите тип --</option>
+      ${availableOrderTypes.map(t => `<option value="${t.id}" ${t.id === selectedTypeId ? 'selected' : ''} data-commission="${t.commission}">${t.name} (${t.commission}%)</option>`).join('')}
+    </select>
+    <input type="number" step="0.01" class="amount-input w-32 border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500" placeholder="Сумма" value="${amount !== null ? amount : ''}" required />
+    ${typeCounter > 1 ? '<button type="button" class="remove-type-btn bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600">×</button>' : '<div class="w-10"></div>'}
+  `;
+
+  container.appendChild(row);
+
+  // Add event listeners
+  const typeSelect = row.querySelector('.type-select');
+  const amountInput = row.querySelector('.amount-input');
+  const removeBtn = row.querySelector('.remove-type-btn');
+
+  if (typeSelect) typeSelect.addEventListener('change', updateAmountValidation);
+  if (amountInput) amountInput.addEventListener('input', updateAmountValidation);
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      updateAmountValidation();
+    });
+  }
+}
+
+function updateAmountValidation() {
+  const totalAmount = parseFloat(document.getElementById('totalAmount').value) || 0;
+  const rows = document.querySelectorAll('.order-type-row');
+
+  let distributedAmount = 0;
+  for (const row of rows) {
+    const amountInput = row.querySelector('.amount-input');
+    if (amountInput && amountInput.value) {
+      distributedAmount += parseFloat(amountInput.value) || 0;
+    }
+  }
+
+  document.getElementById('totalAmountDisplay').textContent = totalAmount.toFixed(2);
+  document.getElementById('distributedAmount').textContent = distributedAmount.toFixed(2);
+
+  const warning = document.getElementById('sumWarning');
+  const submitBtn = document.getElementById('submitBtn');
+
+  // Allow small tolerance for floating point errors
+  if (Math.abs(totalAmount - distributedAmount) > 0.01 && totalAmount > 0) {
+    warning.classList.remove('hidden');
+    submitBtn.disabled = true;
+    submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+  } else {
+    warning.classList.add('hidden');
+    submitBtn.disabled = false;
+    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
+}
 </script>
 {% endblock %}
