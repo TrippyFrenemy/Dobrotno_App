@@ -17,7 +17,9 @@
         <tr>
           <th class="p-4 text-left font-semibold text-gray-700">№</th>
           <th class="p-4 text-left font-semibold text-gray-700">Название</th>
+          {% if current_user.role == 'admin' %}
           <th class="p-4 text-left font-semibold text-gray-700">Процент комиссии (%)</th>
+          {% endif %}
           <th class="p-4 text-left font-semibold text-gray-700">Статус</th>
           <th class="p-4 text-left font-semibold text-gray-700">Действия</th>
         </tr>
@@ -27,7 +29,9 @@
         <tr class="hover:bg-gray-50">
           <td class="p-4 text-gray-900">{{ loop.index }}</td>
           <td class="p-4 font-medium text-gray-900">{{ type.name | e }}</td>
+          {% if current_user.role == 'admin' %}
           <td class="p-4 text-gray-700">{{ type.commission_percent | e }}%</td>
+          {% endif %}
           <td class="p-4">
             {% if type.is_active %}
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -41,14 +45,17 @@
           </td>
           <td class="p-4">
             <div class="flex gap-2">
+              {% if current_user.role == 'admin' %}
               <a href="/order-types/{{ type.id }}/stats"
                  class="text-green-600 hover:text-green-800 font-medium">
                 Статистика
               </a>
+              {% endif %}
               <a href="/order-types/{{ type.id }}/edit"
                  class="text-blue-600 hover:text-blue-800 font-medium">
                 Изменить
               </a>
+              {% if current_user.role == 'admin' %}
               <form method="post" action="/order-types/{{ type.id }}/delete"
                     onsubmit="return confirm('Деактивировать тип заказа?');"
                     class="inline">
@@ -59,6 +66,7 @@
                   </button>
                 {% endif %}
               </form>
+              {% endif %}
             </div>
           </td>
         </tr>

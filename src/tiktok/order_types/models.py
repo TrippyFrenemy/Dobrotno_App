@@ -9,5 +9,5 @@ class OrderType(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
-    commission_percent = Column(Numeric(10, 2), default=0.0, nullable=False)
+    commission_percent = Column(Numeric(10, 2), default=100.0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)

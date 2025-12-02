@@ -69,10 +69,11 @@ async def get_monthly_report(
         orders_map[order.date][order.created_by]['amount'] += order.amount
         orders_map[order.date][order.created_by]['orders'].append(order)
 
-    # Загружаем возвраты с штрафами
+    # Загружаем возвраты с штрафами и связанными заказами
     returns_q = await session.execute(
         select(Return)
         .where(Return.date >= start, Return.date <= end)
+        .options(selectinload(Return.order))
     )
     all_returns = returns_q.scalars().all()
 
@@ -80,8 +81,23 @@ async def get_monthly_report(
     returns_map = defaultdict(Decimal)
     penalties_map_by_date = defaultdict(lambda: defaultdict(lambda: Decimal('0')))
 
+    # Возвраты привязанные к конкретным заказам (по менеджерам)
+    # Структура: {date: {manager_id: Decimal}}
+    returns_by_manager = defaultdict(lambda: defaultdict(Decimal))
+    # Возвраты без привязки к заказу (для равномерного распределения)
+    # Структура: {date: Decimal}
+    returns_unassigned = defaultdict(Decimal)
+
     for ret in all_returns:
         returns_map[ret.date] += ret.amount
+
+        # Определяем как распределить возврат
+        if ret.order_id and ret.order:
+            # Возврат привязан к заказу - вычитаем у владельца заказа
+            returns_by_manager[ret.date][ret.order.created_by] += ret.amount
+        else:
+            # Возврат без привязки - будет распределен равномерно
+            returns_unassigned[ret.date] += ret.amount
 
         # Собираем штрафы по сотрудникам (штрафы привязаны к дате возврата)
         if ret.penalty_distribution:
@@ -185,6 +201,22 @@ async def get_monthly_report(
                     )
 
         # Менеджеры/админы по заказам с учетом комиссии типа
+        # Сначала собираем всех менеджеров за день для равномерного распределения возвратов
+        day_managers = []
+        for uid, order_data in day_orders.items():
+            user = users.get(uid)
+            if user and user.role in [UserRole.ADMIN, UserRole.MANAGER]:
+                day_managers.append(uid)
+
+        # Получаем возвраты за день
+        day_returns_by_manager = returns_by_manager.get(current, {})
+        day_returns_unassigned = returns_unassigned.get(current, Decimal('0'))
+
+        # Равномерная доля нераспределённых возвратов на каждого менеджера
+        unassigned_per_manager = Decimal('0')
+        if day_managers and day_returns_unassigned > 0:
+            unassigned_per_manager = day_returns_unassigned / len(day_managers)
+
         for uid, order_data in day_orders.items():
             user = users.get(uid)
             if user and user.role in [UserRole.ADMIN, UserRole.MANAGER]:
@@ -199,8 +231,9 @@ async def get_monthly_report(
                     order_profit = order.amount * commission / 100
                     total_commission_amount += order_profit
 
-                # Вычитаем возвраты пропорционально и применяем процент менеджера
-                manager_profit = total_commission_amount - returns
+                # Вычитаем возвраты: персональные + равномерная доля от нераспределённых
+                manager_returns = day_returns_by_manager.get(uid, Decimal('0')) + unassigned_per_manager
+                manager_profit = total_commission_amount - manager_returns
                 percent[uid] += round(manager_profit * user.default_percent / 100)
 
         # Финальные суммы с вычетом штрафов

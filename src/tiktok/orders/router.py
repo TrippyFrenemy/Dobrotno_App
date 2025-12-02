@@ -111,11 +111,14 @@ async def list_orders_all(
     day: Optional[int] = Query(date.today().day),
     month: Optional[int] = Query(date.today().month),
     year: Optional[int] = Query(date.today().year),
-    type_id: Optional[int] = Query(None),
+    type_id: Optional[str] = Query(None),
     sort_by: str = Query("date_desc"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_admin_user),
 ):
+    # Конвертируем type_id из строки в int (пустая строка -> None)
+    type_id_int = int(type_id) if type_id else None
+
     filters = [
         extract("day", Order.date) == day,
         extract("month", Order.date) == month,
@@ -123,8 +126,8 @@ async def list_orders_all(
     ]
 
     # Фильтр по типу заказа
-    if type_id is not None:
-        filters.append(Order.type_id == type_id)
+    if type_id_int is not None:
+        filters.append(Order.type_id == type_id_int)
 
     stmt = select(Order).where(and_(*filters)).options(
         joinedload(Order.created_by_user),
@@ -162,7 +165,7 @@ async def list_orders_all(
         "day": day,
         "month": month,
         "year": year,
-        "type_id": type_id,
+        "type_id": type_id_int,
         "sort_by": sort_by,
         "order_types": order_types,
     })
@@ -175,13 +178,16 @@ async def list_orders_user(
     day: Optional[int] = Query(date.today().day),
     month: Optional[int] = Query(date.today().month),
     year: Optional[int] = Query(date.today().year),
-    type_id: Optional[int] = Query(None),
+    type_id: Optional[str] = Query(None),
     sort_by: str = Query("date_desc"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
     if user.id != id and user.role != "admin":
         raise HTTPException(status_code=403, detail="Нет доступа к чужим заказам")
+
+    # Конвертируем type_id из строки в int (пустая строка -> None)
+    type_id_int = int(type_id) if type_id else None
 
     filters = [
         Order.created_by == id,
@@ -191,8 +197,8 @@ async def list_orders_user(
     ]
 
     # Фильтр по типу заказа
-    if type_id is not None:
-        filters.append(Order.type_id == type_id)
+    if type_id_int is not None:
+        filters.append(Order.type_id == type_id_int)
 
     stmt = select(Order).where(and_(*filters)).options(
         joinedload(Order.created_by_user),
@@ -230,7 +236,7 @@ async def list_orders_user(
         "day": day,
         "month": month,
         "year": year,
-        "type_id": type_id,
+        "type_id": type_id_int,
         "sort_by": sort_by,
         "order_types": order_types,
     })
@@ -307,4 +313,3 @@ async def delete_order(
     if user.role == "admin":
         return RedirectResponse("/orders/all/list", status_code=302)
     return RedirectResponse(f"/orders/{user.id}/list", status_code=302)
-

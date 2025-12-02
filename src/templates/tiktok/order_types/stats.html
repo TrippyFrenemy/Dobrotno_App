@@ -5,91 +5,167 @@
 <h2 class="text-2xl font-semibold mb-4">📊 Статистика: {{ order_type.name | e }}</h2>
 
 <!-- Фильтр периода -->
-<form method="get" class="mb-6 flex gap-4 items-end">
-  <div>
-    <label class="block text-sm font-medium text-gray-700">Период (дней)</label>
-    <select name="days" class="border p-2 rounded">
-      <option value="7" {% if days == 7 %}selected{% endif %}>7 дней</option>
-      <option value="14" {% if days == 14 %}selected{% endif %}>14 дней</option>
-      <option value="30" {% if days == 30 %}selected{% endif %}>30 дней</option>
-      <option value="60" {% if days == 60 %}selected{% endif %}>60 дней</option>
-      <option value="90" {% if days == 90 %}selected{% endif %}>90 дней</option>
-      <option value="180" {% if days == 180 %}selected{% endif %}>180 дней</option>
-      <option value="365" {% if days == 365 %}selected{% endif %}>Год</option>
-    </select>
-  </div>
-  <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
-  <a href="/order-types/" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Назад к списку</a>
-</form>
+<div class="bg-white rounded-lg shadow p-4 mb-6">
+  <form method="get" class="space-y-4">
+    <div class="flex flex-wrap gap-4 items-end">
+      <!-- Режим периода -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Режим</label>
+        <select name="period_mode" id="period_mode" class="border p-2 rounded" onchange="togglePeriodInputs()">
+          <option value="new" {% if period_mode == 'new' %}selected{% endif %}>Недельные периоды</option>
+          <option value="custom" {% if period_mode == 'custom' %}selected{% endif %}>Свой период</option>
+        </select>
+      </div>
 
-<!-- Общая статистика -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-  <div class="bg-blue-50 p-4 rounded border border-blue-200">
-    <div class="text-sm text-gray-600">Комиссия типа</div>
-    <div class="text-2xl font-bold text-blue-700">{{ "%.0f"|format(order_type.commission_percent) }}%</div>
-  </div>
-  <div class="bg-green-50 p-4 rounded border border-green-200">
-    <div class="text-sm text-gray-600">Всего заказов</div>
-    <div class="text-2xl font-bold text-green-700">{{ total_count }}</div>
-  </div>
-  <div class="bg-purple-50 p-4 rounded border border-purple-200">
-    <div class="text-sm text-gray-600">Общая сумма</div>
-    <div class="text-2xl font-bold text-purple-700">{{ "%.2f"|format(total_amount) }} грн</div>
-  </div>
-  <div class="bg-orange-50 p-4 rounded border border-orange-200">
-    <div class="text-sm text-gray-600">Средний заказ</div>
-    <div class="text-2xl font-bold text-orange-700">{{ "%.2f"|format(avg_amount) }} грн</div>
-  </div>
+      <!-- Месяц/Год (для недельных периодов) -->
+      <div id="monthly_inputs" class="flex gap-2">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Месяц</label>
+          <select name="month" class="border p-2 rounded">
+            {% for m in range(1, 13) %}
+              <option value="{{ m }}" {% if month == m %}selected{% endif %}>
+                {{ ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][m-1] }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Год</label>
+          <select name="year" class="border p-2 rounded">
+            {% for y in range(2023, 2027) %}
+              <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Свой период -->
+      <div id="custom_inputs" class="flex gap-2" style="display: none;">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">С</label>
+          <input type="date" name="custom_start" value="{{ custom_start if custom_start else '' }}" class="border p-2 rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">По</label>
+          <input type="date" name="custom_end" value="{{ custom_end if custom_end else '' }}" class="border p-2 rounded">
+        </div>
+      </div>
+
+      <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
+      <a href="/order-types/" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Назад к списку</a>
+    </div>
+  </form>
 </div>
 
-<!-- Статистика по дням -->
-{% if daily_stats %}
-<h3 class="text-xl font-semibold mb-3">📈 Статистика по дням ({{ start_date | e }} — {{ end_date | e }})</h3>
-<table class="w-full text-sm border mb-8">
-  <thead class="bg-gray-100">
-    <tr>
-      <th class="p-2 border">Дата</th>
-      <th class="p-2 border">Количество заказов</th>
-      <th class="p-2 border">Сумма</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for day in daily_stats %}
-    <tr>
-      <td class="p-2 border">{{ day.date | e }}</td>
-      <td class="p-2 border text-center">{{ day.count }}</td>
-      <td class="p-2 border text-right">{{ "%.2f"|format(day.amount) }} грн</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="italic text-gray-600 mb-8">Нет данных за выбранный период.</p>
-{% endif %}
+<script>
+function togglePeriodInputs() {
+  const mode = document.getElementById('period_mode').value;
+  const monthly = document.getElementById('monthly_inputs');
+  const custom = document.getElementById('custom_inputs');
+
+  if (mode === 'custom') {
+    monthly.style.display = 'none';
+    custom.style.display = 'flex';
+  } else {
+    monthly.style.display = 'flex';
+    custom.style.display = 'none';
+  }
+}
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', togglePeriodInputs);
+</script>
+
+<!-- Общая информация о типе -->
+<div class="bg-blue-50 p-4 rounded border border-blue-200 mb-6">
+  <div class="text-sm text-gray-600">Комиссия типа</div>
+  <div class="text-2xl font-bold text-blue-700">{{ "%.0f"|format(order_type.commission_percent) }}%</div>
+</div>
+
+<!-- Статистика по периодам -->
+{% for period in periods_data %}
+<div class="bg-white rounded-lg shadow mb-6">
+  <div class="bg-gray-100 px-4 py-3 border-b">
+    <h3 class="text-lg font-semibold">
+      📅 {{ period.title }} ({{ period.start_date.strftime('%d.%m') }} – {{ period.end_date.strftime('%d.%m.%Y') }})
+    </h3>
+  </div>
+
+  <div class="p-4">
+    <!-- Итоги периода -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="bg-green-50 p-3 rounded border border-green-200">
+        <div class="text-sm text-gray-600">Заказов</div>
+        <div class="text-xl font-bold text-green-700">{{ period.total_count }}</div>
+      </div>
+      <div class="bg-purple-50 p-3 rounded border border-purple-200">
+        <div class="text-sm text-gray-600">Сумма</div>
+        <div class="text-xl font-bold text-purple-700">{{ "%.2f"|format(period.total_amount) }} грн</div>
+      </div>
+      <div class="bg-orange-50 p-3 rounded border border-orange-200">
+        <div class="text-sm text-gray-600">Средний заказ</div>
+        <div class="text-xl font-bold text-orange-700">{{ "%.2f"|format(period.avg_amount) }} грн</div>
+      </div>
+    </div>
+
+    <!-- Статистика по дням -->
+    {% if period.daily_stats %}
+    <details class="mt-2">
+      <summary class="cursor-pointer text-blue-600 hover:underline">📈 Показать по дням ({{ period.daily_stats | length }})</summary>
+      <table class="w-full text-sm border mt-2">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="p-2 border">Дата</th>
+            <th class="p-2 border">Заказов</th>
+            <th class="p-2 border">Сумма</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for day in period.daily_stats %}
+          <tr>
+            <td class="p-2 border">{{ day.date.strftime('%d.%m.%Y') }}</td>
+            <td class="p-2 border text-center">{{ day.count }}</td>
+            <td class="p-2 border text-right">{{ "%.2f"|format(day.amount) }} грн</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% else %}
+    <p class="text-gray-500 italic text-sm">Нет данных за этот период</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
 
 <!-- Последние заказы -->
 {% if recent_orders %}
-<h3 class="text-xl font-semibold mb-3">🕒 Последние 20 заказов</h3>
-<table class="w-full text-sm border">
-  <thead class="bg-gray-100">
-    <tr>
-      <th class="p-2 border">№</th>
-      <th class="p-2 border">Дата</th>
-      <th class="p-2 border">Телефон</th>
-      <th class="p-2 border">Сумма</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for order in recent_orders %}
-    <tr>
-      <td class="p-2 border">{{ loop.index }}</td>
-      <td class="p-2 border">{{ order.date | e }}</td>
-      <td class="p-2 border">{{ order.phone_number | e }}</td>
-      <td class="p-2 border text-right">{{ order.amount | e }} грн</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="bg-white rounded-lg shadow">
+  <div class="bg-gray-100 px-4 py-3 border-b">
+    <h3 class="text-lg font-semibold">🕒 Последние 20 заказов</h3>
+  </div>
+  <div class="p-4">
+    <table class="w-full text-sm border">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="p-2 border">№</th>
+          <th class="p-2 border">Дата</th>
+          <th class="p-2 border">Телефон</th>
+          <th class="p-2 border">Сумма</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in recent_orders %}
+        <tr>
+          <td class="p-2 border">{{ loop.index }}</td>
+          <td class="p-2 border">{{ order.date.strftime('%d.%m.%Y') }}</td>
+          <td class="p-2 border">{{ order.phone_number | e }}</td>
+          <td class="p-2 border text-right">{{ order.amount | e }} грн</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% else %}
 <p class="italic text-gray-600">Нет заказов этого типа.</p>
 {% endif %}

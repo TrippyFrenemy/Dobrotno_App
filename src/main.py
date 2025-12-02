@@ -100,7 +100,6 @@ app.include_router(
 app.include_router(
     router=order_types_router,
     tags=["OrderTypes"],
-    dependencies=[Depends(get_admin_user)]
 )
 
 app.include_router(

@@ -25,6 +25,7 @@
         />
       </div>
 
+      {% if current_user.role == 'admin' %}
       <div>
         <label for="commission_percent" class="block text-sm font-medium text-gray-700 mb-1">
           Процент комиссии (%)
@@ -44,6 +45,7 @@
           Дополнительный процент к зарплате сотрудника за заказы этого типа
         </p>
       </div>
+      {% endif %}
 
       <div class="flex items-center">
         <input
