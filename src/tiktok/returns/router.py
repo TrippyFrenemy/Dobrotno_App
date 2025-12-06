@@ -248,7 +248,7 @@ async def update_return(
     date_: date = Form(...),
     amount: Decimal = Form(...),
     reason: str = Form(""),
-    order_id: int = Form(None),
+    order_id: int = Form(...),  # ОБЯЗАТЕЛЬНО: возврат должен быть привязан к заказу
     penalty_amount: Decimal = Form(Decimal("0.0")),
     selected_employees: List[int] = Form([]),
     csrf_token: str = Form(...),
@@ -283,7 +283,7 @@ async def update_return(
     ret.date = date_
     ret.amount = amount
     ret.reason = reason
-    ret.order_id = order_id if order_id else None
+    ret.order_id = order_id  # Теперь всегда указан
     ret.penalty_amount = penalty_amount
     ret.penalty_distribution = penalty_distribution
     await session.commit()

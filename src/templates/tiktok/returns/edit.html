@@ -23,9 +23,9 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Связанный заказ (необязательно)</label>
-      <select name="order_id" id="orderSelect" class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
-        <option value="">Не указан</option>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Связанный заказ <span class="text-red-500">*</span></label>
+      <select name="order_id" id="orderSelect" required class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
+        <option value="">Выберите заказ</option>
         {% for order in orders %}
         <option value="{{ order.id }}" data-order-date="{{ order.date }}" {% if ret.order_id == order.id %}selected{% endif %}>
           Заказ #{{ order.id }} - {{ order.date }} - {{ order.phone_number }} - {{ order.amount }} грн ({{ order.created_by_user.name }})
@@ -74,13 +74,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const orderSelect = document.getElementById("orderSelect");
   
   // Сохраняем все опции заказов
-  const allOrderOptions = Array.from(orderSelect.options).slice(1); // Убираем первую опцию "Не указан"
+  const allOrderOptions = Array.from(orderSelect.options).slice(1); // Убираем первую опцию "Выберите заказ"
 
   // Фильтрация заказов по выбранной дате
   returnDateInput.addEventListener("change", () => {
     const selectedDate = returnDateInput.value;
 
-    // Удаляем все опции кроме первой ("Не указан")
+    // Удаляем все опции кроме первой ("Выберите заказ")
     while (orderSelect.options.length > 1) {
       orderSelect.remove(1);
     }
