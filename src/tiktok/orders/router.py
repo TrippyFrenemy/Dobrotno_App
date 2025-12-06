@@ -96,7 +96,7 @@ async def create_order(
         joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type)
     ).limit(1)
     result = await session.execute(stmt)
-    existing_order = result.scalars().first()
+    existing_order = result.unique().scalars().first()
 
     if existing_order and confirm != "yes":
         # Загружаем типы нового заказа для отображения
@@ -202,7 +202,7 @@ async def list_orders_all(
         joinedload(Order.created_by_user),
         joinedload(Order.order_type),
         joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type)
-    )
+    ).execution_options(populate_existing=True)
 
     # Применяем сортировку
     if sort_by == "date_desc":
@@ -221,7 +221,7 @@ async def list_orders_all(
         stmt = stmt.order_by(Order.date.desc())
 
     result = await session.execute(stmt)
-    orders = result.scalars().all()
+    orders = result.unique().scalars().all()
 
     # Загружаем все типы заказов для фильтра
     types_stmt = select(OrderType).where(OrderType.is_active == True).order_by(OrderType.name)
@@ -274,7 +274,7 @@ async def list_orders_user(
         joinedload(Order.created_by_user),
         joinedload(Order.order_type),
         joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type)
-    )
+    ).execution_options(populate_existing=True)
 
     # Применяем сортировку
     if sort_by == "date_desc":
@@ -293,7 +293,7 @@ async def list_orders_user(
         stmt = stmt.order_by(Order.date.desc())
 
     result = await session.execute(stmt)
-    orders = result.scalars().all()
+    orders = result.unique().scalars().all()
 
     # Загружаем все типы заказов для фильтра
     types_stmt = select(OrderType).where(OrderType.is_active == True).order_by(OrderType.name)
@@ -328,7 +328,7 @@ async def edit_order_page(
         joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type)
     )
     result = await session.execute(stmt)
-    order = result.scalars().first()
+    order = result.unique().scalars().first()
 
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -415,7 +415,7 @@ async def update_order(
         joinedload(Order.order_order_types)
     )
     result = await session.execute(stmt)
-    order = result.scalars().first()
+    order = result.unique().scalars().first()
 
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")

@@ -59,7 +59,7 @@ async def get_monthly_report(
             selectinload(Order.order_order_types).selectinload(OrderOrderType.order_type)  # Новая схема (many-to-many)
         )
     )
-    all_orders = orders_q.scalars().all()
+    all_orders = orders_q.unique().scalars().all()
 
     # Загружаем все типы заказов для справочника
     from src.tiktok.order_types.models import OrderType
