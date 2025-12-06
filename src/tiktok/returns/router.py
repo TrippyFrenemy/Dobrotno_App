@@ -51,7 +51,7 @@ async def create_return(
     date_: date = Form(...),
     amount: Decimal = Form(...),
     reason: str = Form(""),
-    order_id: int = Form(None),
+    order_id: int = Form(...),  # ОБЯЗАТЕЛЬНО: возврат должен быть привязан к заказу
     penalty_amount: Decimal = Form(Decimal("0.0")),
     selected_employees: List[int] = Form([]),
     csrf_token: str = Form(...),
@@ -83,7 +83,7 @@ async def create_return(
         date=date_,
         amount=amount,
         reason=reason,
-        order_id=order_id if order_id else None,
+        order_id=order_id,  # Теперь всегда указан
         penalty_amount=penalty_amount,
         penalty_distribution=penalty_distribution,
         created_by=user.id

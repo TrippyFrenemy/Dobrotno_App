@@ -16,7 +16,7 @@ class Return(Base):
     created_at = Column(DateTime, default=datetime.now, server_default=text("now()"))
 
     # Новые поля для штрафов
-    order_id = Column(ForeignKey("orders.id"), nullable=True)  # Привязка к заказу (опционально)
+    order_id = Column(ForeignKey("orders.id"), nullable=False)  # Привязка к заказу (ОБЯЗАТЕЛЬНО)
     penalty_amount = Column(Numeric(10, 2), default=0.0, server_default='0.0', nullable=False)  # Сумма штрафа
     penalty_distribution = Column(JSONB, default=dict, server_default='{}', nullable=False)  # {user_id: amount}
 

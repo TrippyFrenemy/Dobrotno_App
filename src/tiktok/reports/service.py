@@ -72,16 +72,20 @@ async def get_monthly_report(
         orders_map[order.date][order.created_by]['amount'] += order.amount
         orders_map[order.date][order.created_by]['orders'].append(order)
 
-    # Загружаем возвраты с штрафами и связанными заказами
+    # Загружаем возвраты с штрафами и связанными заказами (с типами)
     returns_q = await session.execute(
         select(Return)
         .where(Return.date >= start, Return.date <= end)
-        .options(selectinload(Return.order))
+        .options(
+            selectinload(Return.order).selectinload(Order.order_order_types).selectinload(OrderOrderType.order_type),
+            selectinload(Return.order).selectinload(Order.order_type)
+        )
     )
     all_returns = returns_q.scalars().all()
 
     # Группируем возвраты по дате
     returns_map = defaultdict(Decimal)
+    returns_details_map = defaultdict(list)  # Детали возвратов для отображения
     penalties_map_by_date = defaultdict(lambda: defaultdict(lambda: Decimal('0')))
 
     # Возвраты привязанные к конкретным заказам (по менеджерам)
@@ -93,6 +97,30 @@ async def get_monthly_report(
 
     for ret in all_returns:
         returns_map[ret.date] += ret.amount
+
+        # Собираем типы заказа для возврата
+        order_types_info = []
+        if ret.order:
+            if ret.order.order_order_types:
+                # Новая схема: несколько типов
+                for oot in ret.order.order_order_types:
+                    order_types_info.append({
+                        'name': oot.order_type.name if oot.order_type else "?",
+                        'amount': oot.amount
+                    })
+            elif ret.order.order_type:
+                # Старая схема: один тип
+                order_types_info.append({
+                    'name': ret.order.order_type.name,
+                    'amount': ret.order.amount
+                })
+
+        returns_details_map[ret.date].append({
+            'amount': ret.amount,
+            'order_id': ret.order_id,
+            'order_types': order_types_info,
+            'reason': ret.reason
+        })
 
         # Определяем как распределить возврат
         if ret.order_id and ret.order:
@@ -138,8 +166,8 @@ async def get_monthly_report(
                         for order_type_link in order.order_order_types:
                             type_name = order_type_link.order_type.name if order_type_link.order_type else "Без типа"
                             orders_by_type[type_name]['amount'] += order_type_link.amount
-                            # Каждый order_type_link считаем как 1/N часть заказа
-                            orders_by_type[type_name]['count'] += Decimal('1') / len(order.order_order_types)
+                            # Каждый заказ считается ЦЕЛИКОМ (даже если несколько типов)
+                            orders_by_type[type_name]['count'] += 1
                     # СТАРАЯ СХЕМА: один тип
                     elif order.type_id:
                         type_name = order_types[order.type_id].name if order.type_id in order_types else "Без типа"
@@ -286,6 +314,7 @@ async def get_monthly_report(
             "date": current,
             "orders": total_orders,
             "returns": returns,
+            "returns_details": returns_details_map.get(current, []),  # Детали возвратов с типами заказов
             "cashbox": cashbox,
             "salary_by_user": salary_by_user,
             "salary_fixed_by_user": salary_fixed_by_user,

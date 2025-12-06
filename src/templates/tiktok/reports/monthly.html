@@ -78,7 +78,25 @@ function toggleCustomPeriod() {
     <tr>
       <td class="p-2 border">{{ day.date | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(day.orders) | e }}</td>
-      <td class="p-2 border">{{ "%.2f"|format(day.returns) | e }}</td>
+      <td class="p-2 border">
+        <div>{{ "%.2f"|format(day.returns) | e }}</div>
+        {% if day.returns_details %}
+        <div class="text-xs text-gray-600 mt-1">
+          {% for ret in day.returns_details %}
+          <div class="mb-1">
+            <span class="font-medium">{{ "%.2f"|format(ret.amount) }} грн</span>
+            {% if ret.order_types %}
+            <span class="text-gray-500">(</span>
+            {% for ot in ret.order_types %}
+              <span class="text-gray-700">{{ ot.name }}: {{ "%.2f"|format(ot.amount) }}</span>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+            <span class="text-gray-500">)</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </td>
       <td class="p-2 border">{{ "%.2f"|format(day.cashbox) | e }}</td>
       <td class="p-2 border">
         <ul class="list-disc list-inside">
