@@ -35,5 +35,5 @@ class Order(Base):
 
     created_by_user = relationship("User", backref="orders", lazy="joined")
     order_type = relationship("OrderType", foreign_keys=[type_id], lazy="joined")  # Старая схема
-    order_order_types = relationship("OrderOrderType", back_populates="order", lazy="joined", cascade="all, delete-orphan")  # Новая схема
+    order_order_types = relationship("OrderOrderType", back_populates="order", lazy="selectin", cascade="all, delete-orphan")  # Новая схема - selectin избегает дубликатов
     

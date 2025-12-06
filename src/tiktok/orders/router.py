@@ -30,7 +30,10 @@ async def create_order_page(
     # Получаем активные типы заказов
     stmt = select(OrderType).where(OrderType.is_active == True).order_by(OrderType.name)
     result = await session.execute(stmt)
-    order_types = result.scalars().all()
+    order_types_db = result.scalars().all()
+
+    # Конвертируем в словари для JSON сериализации
+    order_types = [{"id": ot.id, "name": ot.name} for ot in order_types_db]
 
     return templates.TemplateResponse("tiktok/orders/create.html", {
         "request": request,
@@ -336,7 +339,10 @@ async def edit_order_page(
     # Получаем активные типы заказов
     types_stmt = select(OrderType).where(OrderType.is_active == True).order_by(OrderType.name)
     types_result = await session.execute(types_stmt)
-    order_types = types_result.scalars().all()
+    order_types_db = types_result.scalars().all()
+
+    # Конвертируем в словари для JSON сериализации
+    order_types = [{"id": ot.id, "name": ot.name} for ot in order_types_db]
 
     # Подготавливаем текущие типы для отображения
     current_types = []
