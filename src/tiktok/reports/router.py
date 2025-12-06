@@ -13,6 +13,7 @@ from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.tiktok.reports.service import get_half_month_periods, get_weekly_periods, get_monthly_report, get_payouts_for_period, summarize_period
 from src.users.models import User
 from src.payouts.models import Location
+from src.utils.query_params import optional_date
 
 from src.tasks.reporting import _build_period_for_today, _generate_and_send_reports
 
@@ -25,11 +26,15 @@ async def monthly_report_page(
     month: int = Query(None, ge=1, le=12),
     year: int = Query(None),
     period_mode: str = Query("new", regex="^(old|new|custom)$"),  # new - 4 периода, old - 2 периода, custom - произвольный
-    custom_start: date = Query(None),
-    custom_end: date = Query(None),
+    custom_start: str = Query(None),
+    custom_end: str = Query(None),
     session: AsyncSession = Depends(get_async_session),
     user = Depends(get_manager_or_admin),
 ):
+    # Convert optional date strings to date objects (handles empty strings)
+    custom_start_date = optional_date(custom_start)
+    custom_end_date = optional_date(custom_end)
+
     today = date.today()
 
     # Выбор по умолчанию: текущий или предыдущий месяц
@@ -49,30 +54,30 @@ async def monthly_report_page(
     # Выбор логики периодов
     if period_mode == "custom":
         # Произвольный период
-        if not custom_start or not custom_end:
+        if not custom_start_date or not custom_end_date:
             # Если даты не указаны, показываем текущий месяц в режиме new
             period_mode = "new"
-        elif custom_start > custom_end:
+        elif custom_start_date > custom_end_date:
             raise HTTPException(status_code=400, detail="Дата начала не может быть позже даты окончания")
         else:
-            data_custom = await get_monthly_report(session, custom_start, custom_end, current_user=user)
-            payouts_custom = await get_payouts_for_period(session, custom_start, custom_end, current_user=user)
+            data_custom = await get_monthly_report(session, custom_start_date, custom_end_date, current_user=user)
+            payouts_custom = await get_payouts_for_period(session, custom_start_date, custom_end_date, current_user=user)
             custom_summary = summarize_period(data_custom, payouts_custom)
 
             periods = [
-                (f"{custom_start.day}.{custom_start.month}–{custom_end.day}.{custom_end.month}", custom_summary, (custom_start, custom_end))
+                (f"{custom_start_date.day}.{custom_start_date.month}–{custom_end_date.day}.{custom_end_date.month}", custom_summary, (custom_start_date, custom_end_date))
             ]
 
             return templates.TemplateResponse("tiktok/reports/monthly.html", {
                 "request": request,
                 "user": user,
                 "user_map": user_map,
-                "year": year or custom_start.year,
-                "month": month or custom_start.month,
+                "year": year or custom_start_date.year,
+                "month": month or custom_start_date.month,
                 "period_mode": period_mode,
                 "periods": periods,
-                "custom_start": custom_start,
-                "custom_end": custom_end,
+                "custom_start": custom_start_date,
+                "custom_end": custom_end_date,
             })
 
     if period_mode == "old":

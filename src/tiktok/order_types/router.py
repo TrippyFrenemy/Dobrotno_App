@@ -10,9 +10,10 @@ from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.database import get_async_session
 from src.users.models import User
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
+from src.utils.query_params import optional_date
 from src.tiktok.orders.models import Order
-from .models import OrderType
-from .schemas import OrderTypeCreate, OrderTypeUpdate
+from src.tiktok.order_types.models import OrderType
+from src.tiktok.order_types.schemas import OrderTypeCreate, OrderTypeUpdate
 
 router = APIRouter(prefix="/order-types", tags=["Order Types"])
 templates = Jinja2Templates(directory="src/templates")
@@ -44,13 +45,17 @@ async def order_type_stats(
     month: int = Query(None, ge=1, le=12),
     year: int = Query(None),
     period_mode: str = Query("new", regex="^(new|custom)$"),
-    custom_start: date = Query(None),
-    custom_end: date = Query(None),
+    custom_start: str = Query(None),
+    custom_end: str = Query(None),
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_admin_user),
 ):
     """Статистика по конкретному типу заказа"""
     from src.tiktok.reports.service import get_weekly_periods
+
+    # Convert optional date strings to date objects (handles empty strings)
+    custom_start_date = optional_date(custom_start)
+    custom_end_date = optional_date(custom_end)
 
     # Получаем тип заказа
     stmt = select(OrderType).where(OrderType.id == order_type_id)
@@ -73,10 +78,10 @@ async def order_type_stats(
 
     # Определяем периоды
     periods = []
-    if period_mode == "custom" and custom_start and custom_end:
-        if custom_start > custom_end:
+    if period_mode == "custom" and custom_start_date and custom_end_date:
+        if custom_start_date > custom_end_date:
             raise HTTPException(status_code=400, detail="Дата начала не может быть позже даты окончания")
-        periods = [(f"{custom_start.day}.{custom_start.month}–{custom_end.day}.{custom_end.month}", custom_start, custom_end)]
+        periods = [(f"{custom_start_date.day}.{custom_start_date.month}–{custom_end_date.day}.{custom_end_date.month}", custom_start_date, custom_end_date)]
     else:
         # Недельные периоды
         period1, period2, period3, period4 = get_weekly_periods(month, year)
@@ -153,8 +158,8 @@ async def order_type_stats(
             "month": month,
             "year": year,
             "period_mode": period_mode,
-            "custom_start": custom_start,
-            "custom_end": custom_end,
+            "custom_start": custom_start_date,
+            "custom_end": custom_end_date,
             "periods_data": periods_data,
             "recent_orders": recent_orders,
         },
