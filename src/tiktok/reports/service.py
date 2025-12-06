@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.tiktok.orders.models import Order
+from src.tiktok.orders.models import Order, OrderOrderType
 from src.tiktok.returns.models import Return
 from src.tiktok.shifts.models import Shift, ShiftAssignment
 from src.users.models import User, UserRole
@@ -50,13 +50,16 @@ async def get_monthly_report(
     users_q = await session.execute(select(User))
     users = {u.id: u for u in users_q.scalars().all()}
 
-    # Загружаем все заказы с типами для учета комиссии
+    # Загружаем все заказы с типами для учета комиссии (поддержка обеих схем)
     orders_q = await session.execute(
         select(Order)
         .where(Order.date >= start, Order.date <= end)
-        .options(selectinload(Order.order_type))
+        .options(
+            selectinload(Order.order_type),  # Старая схема (type_id)
+            selectinload(Order.order_order_types).selectinload(OrderOrderType.order_type)  # Новая схема (many-to-many)
+        )
     )
-    all_orders = orders_q.scalars().all()
+    all_orders = orders_q.unique().scalars().all()
 
     # Загружаем все типы заказов для справочника
     from src.tiktok.order_types.models import OrderType
@@ -69,16 +72,20 @@ async def get_monthly_report(
         orders_map[order.date][order.created_by]['amount'] += order.amount
         orders_map[order.date][order.created_by]['orders'].append(order)
 
-    # Загружаем возвраты с штрафами и связанными заказами
+    # Загружаем возвраты с штрафами и связанными заказами (с типами)
     returns_q = await session.execute(
         select(Return)
         .where(Return.date >= start, Return.date <= end)
-        .options(selectinload(Return.order))
+        .options(
+            selectinload(Return.order).selectinload(Order.order_order_types).selectinload(OrderOrderType.order_type),
+            selectinload(Return.order).selectinload(Order.order_type)
+        )
     )
     all_returns = returns_q.scalars().all()
 
     # Группируем возвраты по дате
     returns_map = defaultdict(Decimal)
+    returns_details_map = defaultdict(list)  # Детали возвратов для отображения
     penalties_map_by_date = defaultdict(lambda: defaultdict(lambda: Decimal('0')))
 
     # Возвраты привязанные к конкретным заказам (по менеджерам)
@@ -90,6 +97,30 @@ async def get_monthly_report(
 
     for ret in all_returns:
         returns_map[ret.date] += ret.amount
+
+        # Собираем типы заказа для возврата
+        order_types_info = []
+        if ret.order:
+            if ret.order.order_order_types:
+                # Новая схема: несколько типов
+                for oot in ret.order.order_order_types:
+                    order_types_info.append({
+                        'name': oot.order_type.name if oot.order_type else "?",
+                        'amount': oot.amount
+                    })
+            elif ret.order.order_type:
+                # Старая схема: один тип
+                order_types_info.append({
+                    'name': ret.order.order_type.name,
+                    'amount': ret.order.amount
+                })
+
+        returns_details_map[ret.date].append({
+            'amount': ret.amount,
+            'order_id': ret.order_id,
+            'order_types': order_types_info,
+            'reason': ret.reason
+        })
 
         # Определяем как распределить возврат
         if ret.order_id and ret.order:
@@ -125,28 +156,27 @@ async def get_monthly_report(
         total_orders = sum(order_data['amount'] for order_data in day_orders.values())
         cashbox = total_orders - returns
 
-        # Статистика по типам заказов
+        # Статистика по типам заказов (только для админов, менеджеры не видят)
         orders_by_type = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
         if current_user.role != UserRole.MANAGER:
             for uid, order_data in day_orders.items():
                 for order in order_data['orders']:
-                    type_id = order.type_id
-                    type_name = order_types[type_id].name if type_id and type_id in order_types else "Без типа"
-                    orders_by_type[type_name]['amount'] += order.amount
-                    orders_by_type[type_name]['count'] += 1
-
-        # Статистика по создателям (менеджерам)
-        # Для MANAGER этот блок скрываем полностью (таблица "💼 Касса по менеджерам" не отображается).
-        orders_by_creator = {}
-        if current_user.role != UserRole.MANAGER:
-            for uid, order_data in day_orders.items():
-                user = users.get(uid)
-                if user:
-                    orders_by_creator[uid] = {
-                        'name': user.name,
-                        'amount': order_data['amount'],
-                        'count': len(order_data['orders'])
-                    }
+                    # НОВАЯ СХЕМА: несколько типов
+                    if order.order_order_types:
+                        for order_type_link in order.order_order_types:
+                            type_name = order_type_link.order_type.name if order_type_link.order_type else "Без типа"
+                            orders_by_type[type_name]['amount'] += order_type_link.amount
+                            # Каждый заказ считается ЦЕЛИКОМ (даже если несколько типов)
+                            orders_by_type[type_name]['count'] += 1
+                    # СТАРАЯ СХЕМА: один тип
+                    elif order.type_id:
+                        type_name = order_types[order.type_id].name if order.type_id in order_types else "Без типа"
+                        orders_by_type[type_name]['amount'] += order.amount
+                        orders_by_type[type_name]['count'] += 1
+                    # БЕЗ ТИПА
+                    else:
+                        orders_by_type["Без типа"]['amount'] += order.amount
+                        orders_by_type["Без типа"]['count'] += 1
 
         fixed = defaultdict(Decimal)
         percent = defaultdict(Decimal)
@@ -225,16 +255,42 @@ async def get_monthly_report(
                 # Рассчитываем процент с учетом комиссии каждого типа заказа
                 total_commission_amount = Decimal('0')
                 for order in order_data['orders']:
-                    # Комиссия типа заказа (по умолчанию 100% если тип не указан)
-                    commission = order.order_type.commission_percent if order.order_type else Decimal('100')
-                    # Прибыль от заказа с учетом комиссии
-                    order_profit = order.amount * commission / 100
-                    total_commission_amount += order_profit
+                    # НОВАЯ СХЕМА: несколько типов с распределением суммы
+                    if order.order_order_types:
+                        for order_type_link in order.order_order_types:
+                            type_amount = order_type_link.amount
+                            commission = order_type_link.order_type.commission_percent if order_type_link.order_type else Decimal('100')
+                            order_profit = type_amount * commission / 100
+                            total_commission_amount += order_profit
+                    # СТАРАЯ СХЕМА: один тип на весь заказ
+                    elif order.order_type:
+                        commission = order.order_type.commission_percent
+                        order_profit = order.amount * commission / 100
+                        total_commission_amount += order_profit
+                    # СОВСЕМ СТАРЫЕ ЗАКАЗЫ: без типа (100% комиссия)
+                    else:
+                        total_commission_amount += order.amount
 
                 # Вычитаем возвраты: персональные + равномерная доля от нераспределённых
                 manager_returns = day_returns_by_manager.get(uid, Decimal('0')) + unassigned_per_manager
                 manager_profit = total_commission_amount - manager_returns
                 percent[uid] += round(manager_profit * user.default_percent / 100)
+    
+        # Статистика по создателям (менеджерам)
+        # Для MANAGER этот блок скрываем полностью (таблица "💼 Касса по менеджерам" не отображается).
+        orders_by_creator = {}
+        if current_user.role != UserRole.MANAGER:
+            for uid, order_data in day_orders.items():
+                user = users.get(uid)
+                if user:
+                    # Возвраты менеджера = персональные + доля от нераспределённых
+                    manager_returns = day_returns_by_manager.get(uid, Decimal('0')) + unassigned_per_manager
+                    orders_by_creator[uid] = {
+                        'name': user.name,
+                        'amount': order_data['amount'],
+                        'count': len(order_data['orders']),
+                        'returns': manager_returns
+                    }
 
         # Финальные суммы с вычетом штрафов
         salary_by_user = {}
@@ -261,6 +317,7 @@ async def get_monthly_report(
             "date": current,
             "orders": total_orders,
             "returns": returns,
+            "returns_details": returns_details_map.get(current, []),  # Детали возвратов с типами заказов
             "cashbox": cashbox,
             "salary_by_user": salary_by_user,
             "salary_fixed_by_user": salary_fixed_by_user,
@@ -300,7 +357,7 @@ def summarize_period(days: list[dict], payouts: dict[int, Decimal]):
     # Агрегация по типам заказов
     types_acc = defaultdict(lambda: {"amount": Decimal("0"), "count": 0})
     # Агрегация по создателям
-    creators_acc = defaultdict(lambda: {"name": "", "amount": Decimal("0"), "count": 0})
+    creators_acc = defaultdict(lambda: {"name": "", "amount": Decimal("0"), "count": 0, "returns": Decimal("0")})
 
     for day in days:
         total_orders += day["orders"]
@@ -323,6 +380,7 @@ def summarize_period(days: list[dict], payouts: dict[int, Decimal]):
             creators_acc[uid]["name"] = creator_data["name"]
             creators_acc[uid]["amount"] += creator_data["amount"]
             creators_acc[uid]["count"] += creator_data["count"]
+            creators_acc[uid]["returns"] += creator_data.get("returns", Decimal("0"))
 
     salaries = []
     for uid, parts in salary_acc.items():
@@ -350,7 +408,7 @@ def summarize_period(days: list[dict], payouts: dict[int, Decimal]):
     ]
 
     creators_breakdown = [
-        {"user_id": uid, "name": data["name"], "amount": data["amount"], "count": data["count"]}
+        {"user_id": uid, "name": data["name"], "amount": data["amount"], "count": data["count"], "returns": data["returns"]}
         for uid, data in sorted(creators_acc.items(), key=lambda x: x[1]["amount"], reverse=True)
     ]
 

@@ -145,6 +145,7 @@ function toggleCustomPeriod() {
     <tr>
       <th class="p-2 border">Менеджер</th>
       <th class="p-2 border">Сумма заказов</th>
+      <th class="p-2 border">Возвраты</th>
       <th class="p-2 border">Количество</th>
     </tr>
   </thead>
@@ -153,6 +154,9 @@ function toggleCustomPeriod() {
     <tr>
       <td class="p-2 border">{{ creator.name | e }}</td>
       <td class="p-2 border">{{ "%.2f"|format(creator.amount) }}</td>
+      <td class="p-2 border {% if creator.returns > 0 %}text-red-600{% endif %}">
+        {% if creator.returns > 0 %}-{% endif %}{{ "%.2f"|format(creator.returns) }}
+      </td>
       <td class="p-2 border">{{ creator.count }}</td>
     </tr>
     {% endfor %}
