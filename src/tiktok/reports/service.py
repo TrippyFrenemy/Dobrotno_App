@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.tiktok.orders.models import Order
+from src.tiktok.orders.models import Order, OrderOrderType
 from src.tiktok.returns.models import Return
 from src.tiktok.shifts.models import Shift, ShiftAssignment
 from src.users.models import User, UserRole
@@ -50,11 +50,14 @@ async def get_monthly_report(
     users_q = await session.execute(select(User))
     users = {u.id: u for u in users_q.scalars().all()}
 
-    # Загружаем все заказы с типами для учета комиссии
+    # Загружаем все заказы с типами для учета комиссии (поддержка обеих схем)
     orders_q = await session.execute(
         select(Order)
         .where(Order.date >= start, Order.date <= end)
-        .options(selectinload(Order.order_type))
+        .options(
+            selectinload(Order.order_type),  # Старая схема (type_id)
+            selectinload(Order.order_order_types).selectinload(OrderOrderType.order_type)  # Новая схема (many-to-many)
+        )
     )
     all_orders = orders_q.scalars().all()
 
@@ -125,15 +128,27 @@ async def get_monthly_report(
         total_orders = sum(order_data['amount'] for order_data in day_orders.values())
         cashbox = total_orders - returns
 
-        # Статистика по типам заказов
+        # Статистика по типам заказов (только для админов, менеджеры не видят)
         orders_by_type = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
         if current_user.role != UserRole.MANAGER:
             for uid, order_data in day_orders.items():
                 for order in order_data['orders']:
-                    type_id = order.type_id
-                    type_name = order_types[type_id].name if type_id and type_id in order_types else "Без типа"
-                    orders_by_type[type_name]['amount'] += order.amount
-                    orders_by_type[type_name]['count'] += 1
+                    # НОВАЯ СХЕМА: несколько типов
+                    if order.order_order_types:
+                        for order_type_link in order.order_order_types:
+                            type_name = order_type_link.order_type.name if order_type_link.order_type else "Без типа"
+                            orders_by_type[type_name]['amount'] += order_type_link.amount
+                            # Каждый order_type_link считаем как 1/N часть заказа
+                            orders_by_type[type_name]['count'] += Decimal('1') / len(order.order_order_types)
+                    # СТАРАЯ СХЕМА: один тип
+                    elif order.type_id:
+                        type_name = order_types[order.type_id].name if order.type_id in order_types else "Без типа"
+                        orders_by_type[type_name]['amount'] += order.amount
+                        orders_by_type[type_name]['count'] += 1
+                    # БЕЗ ТИПА
+                    else:
+                        orders_by_type["Без типа"]['amount'] += order.amount
+                        orders_by_type["Без типа"]['count'] += 1
 
         # Статистика по создателям (менеджерам)
         # Для MANAGER этот блок скрываем полностью (таблица "💼 Касса по менеджерам" не отображается).
@@ -225,11 +240,21 @@ async def get_monthly_report(
                 # Рассчитываем процент с учетом комиссии каждого типа заказа
                 total_commission_amount = Decimal('0')
                 for order in order_data['orders']:
-                    # Комиссия типа заказа (по умолчанию 100% если тип не указан)
-                    commission = order.order_type.commission_percent if order.order_type else Decimal('100')
-                    # Прибыль от заказа с учетом комиссии
-                    order_profit = order.amount * commission / 100
-                    total_commission_amount += order_profit
+                    # НОВАЯ СХЕМА: несколько типов с распределением суммы
+                    if order.order_order_types:
+                        for order_type_link in order.order_order_types:
+                            type_amount = order_type_link.amount
+                            commission = order_type_link.order_type.commission_percent if order_type_link.order_type else Decimal('100')
+                            order_profit = type_amount * commission / 100
+                            total_commission_amount += order_profit
+                    # СТАРАЯ СХЕМА: один тип на весь заказ
+                    elif order.order_type:
+                        commission = order.order_type.commission_percent
+                        order_profit = order.amount * commission / 100
+                        total_commission_amount += order_profit
+                    # СОВСЕМ СТАРЫЕ ЗАКАЗЫ: без типа (100% комиссия)
+                    else:
+                        total_commission_amount += order.amount
 
                 # Вычитаем возвраты: персональные + равномерная доля от нераспределённых
                 manager_returns = day_returns_by_manager.get(uid, Decimal('0')) + unassigned_per_manager

@@ -4,26 +4,39 @@
 <script src="https://unpkg.com/inputmask@5.0.8/dist/inputmask.min.js"></script>
 {% endblock %}
 {% block content %}
-<div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
+<div class="max-w-2xl mx-auto bg-white p-6 rounded shadow">
   <h2 class="text-xl font-semibold mb-4">Добавить заказ</h2>
-  <form method="post" class="flex flex-col gap-4">
+  <form method="post" id="orderForm" class="flex flex-col gap-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        Тип заказа <span class="text-red-500">*</span>
-      </label>
-      <select name="type_id" required class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
-        <option value="">Выберите тип заказа</option>
-        {% for type in order_types %}
-        <option value="{{ type.id }}">{{ type.name | e }}</option>
-        {% endfor %}
-      </select>
-    </div>
 
     <input type="text" name="phone_number" placeholder="Номер телефона" required class="border p-2 rounded" />
     <input type="date" name="date_" required class="border p-2 rounded" />
-    <input type="number" step="0.01" name="amount" placeholder="Сумма заказа (грн)" required class="border p-2 rounded" />
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Общая сумма заказа (грн) <span class="text-red-500">*</span>
+      </label>
+      <input type="number" step="0.01" name="amount" id="totalAmount" placeholder="Сумма заказа" required class="border p-2 rounded w-full" />
+    </div>
+
+    <div class="border-t pt-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">
+        Типы заказов <span class="text-red-500">*</span>
+      </label>
+
+      <div id="typesList" class="space-y-2 mb-3">
+        <!-- Динамические строки типов будут здесь -->
+      </div>
+
+      <button type="button" id="addTypeBtn" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+        + Добавить тип
+      </button>
+
+      <div id="sumValidation" class="mt-3 p-3 rounded text-sm">
+        <!-- Валидация суммы -->
+      </div>
+    </div>
+
     <button type="submit" class="bg-green-600 text-white py-2 rounded hover:bg-green-700">Сохранить</button>
   </form>
   <div id="shift-info" class="hidden mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm transition-all duration-300">
@@ -41,9 +54,15 @@
 </div>
 
 <script>
+const orderTypes = {{ order_types | tojson }};
+
 document.addEventListener("DOMContentLoaded", () => {
   const phoneInput = document.querySelector('input[name="phone_number"]');
-  const form = phoneInput.closest("form");
+  const form = document.getElementById("orderForm");
+  const totalAmountInput = document.getElementById("totalAmount");
+  const typesList = document.getElementById("typesList");
+  const addTypeBtn = document.getElementById("addTypeBtn");
+  const sumValidation = document.getElementById("sumValidation");
 
   const im = new Inputmask("38099-999-99-99", {
     placeholder: "_",
@@ -51,25 +70,134 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   im.mask(phoneInput);
 
+  let typeRowsCount = 0;
+
+  // Добавить строку типа
+  function addTypeRow(typeId = "", amount = "") {
+    const rowId = ++typeRowsCount;
+    const row = document.createElement("div");
+    row.className = "flex gap-2 items-center";
+    row.dataset.rowId = rowId;
+
+    // Автозаполнение суммы если это первый тип
+    const currentTotal = parseFloat(totalAmountInput.value) || 0;
+    if (amount === "" && typesList.children.length === 0 && currentTotal > 0) {
+      amount = currentTotal.toFixed(2);
+    }
+
+    row.innerHTML = `
+      <select name="type_id_${rowId}" required class="flex-1 border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
+        <option value="">Выберите тип</option>
+        ${orderTypes.map(t => `<option value="${t.id}" ${t.id == typeId ? 'selected' : ''}>${t.name}</option>`).join('')}
+      </select>
+      <input type="number" step="0.01" name="type_amount_${rowId}" value="${amount}" placeholder="Сумма" required class="w-32 border p-2 rounded" />
+      <button type="button" class="remove-type text-red-600 hover:text-red-800 px-2">✕</button>
+    `;
+
+    row.querySelector(".remove-type").addEventListener("click", () => {
+      row.remove();
+      updateValidation();
+      if (typesList.children.length === 0) {
+        addTypeRow(); // Минимум 1 тип
+      }
+    });
+
+    row.querySelector('select').addEventListener("change", updateValidation);
+    row.querySelector('input[type="number"]').addEventListener("input", updateValidation);
+
+    typesList.appendChild(row);
+    updateValidation();
+  }
+
+  // Валидация суммы и дубликатов типов
+  function updateValidation() {
+    const totalAmount = parseFloat(totalAmountInput.value) || 0;
+    const rows = Array.from(typesList.querySelectorAll('[data-row-id]'));
+
+    let typesSum = 0;
+    const selectedTypes = new Set();
+    let hasDuplicates = false;
+
+    rows.forEach(row => {
+      const typeId = row.querySelector('select').value;
+      const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+
+      if (typeId) {
+        if (selectedTypes.has(typeId)) {
+          hasDuplicates = true;
+        }
+        selectedTypes.add(typeId);
+      }
+
+      typesSum += amount;
+    });
+
+    const diff = Math.abs(totalAmount - typesSum);
+    const isValid = diff < 0.01 && !hasDuplicates && rows.length > 0;
+
+    if (hasDuplicates) {
+      sumValidation.className = "mt-3 p-3 rounded text-sm bg-red-50 border border-red-200 text-red-700";
+      sumValidation.textContent = "❌ Нельзя выбрать один тип дважды!";
+    } else if (diff >= 0.01) {
+      sumValidation.className = "mt-3 p-3 rounded text-sm bg-yellow-50 border border-yellow-200 text-yellow-700";
+      sumValidation.textContent = `⚠️ Сумма типов: ${typesSum.toFixed(2)} грн / Общая сумма: ${totalAmount.toFixed(2)} грн`;
+    } else {
+      sumValidation.className = "mt-3 p-3 rounded text-sm bg-green-50 border border-green-200 text-green-700";
+      sumValidation.textContent = `✓ Сумма типов: ${typesSum.toFixed(2)} грн`;
+    }
+
+    return isValid;
+  }
+
+  // Кнопка добавления типа
+  addTypeBtn.addEventListener("click", () => addTypeRow());
+
+  // Авто-обновление при изменении общей суммы
+  totalAmountInput.addEventListener("input", () => {
+    // Если есть только один тип, автоматически обновляем его сумму
+    const rows = Array.from(typesList.querySelectorAll('[data-row-id]'));
+    if (rows.length === 1) {
+      const amountInput = rows[0].querySelector('input[type="number"]');
+      amountInput.value = totalAmountInput.value;
+    }
+    updateValidation();
+  });
+
+  // Валидация при отправке
   form.addEventListener("submit", (e) => {
-    const rawValue = phoneInput.inputmask.test(phoneInput.value);
-    const valid = /^380\d{2}-\d{3}-\d{2}-\d{2}$/.test(rawValue);
+    const phoneValid = /^380\d{2}-\d{3}-\d{2}-\d{2}$/.test(phoneInput.value);
 
-    if (!valid) {
-        e.preventDefault();
-        const toast = document.getElementById("toast");
-        toast.classList.remove("hidden");
-        toast.classList.add("block");
-
-        setTimeout(() => {
+    if (!phoneValid) {
+      e.preventDefault();
+      const toast = document.getElementById("toast");
+      toast.classList.remove("hidden");
+      toast.classList.add("block");
+      setTimeout(() => {
         toast.classList.add("hidden");
         toast.classList.remove("block");
-        }, 3000);
+      }, 3000);
+      return;
     }
-    });
-});
 
-document.addEventListener("DOMContentLoaded", () => {
+    if (!updateValidation()) {
+      e.preventDefault();
+      alert("Проверьте корректность заполнения типов заказа!");
+      return;
+    }
+
+    // Проверка минимум 1 типа
+    const rows = Array.from(typesList.querySelectorAll('[data-row-id]'));
+    if (rows.length === 0) {
+      e.preventDefault();
+      alert("Выберите хотя бы один тип заказа!");
+      return;
+    }
+  });
+
+  // Добавляем первый тип по умолчанию
+  addTypeRow();
+
+  // Shift info loading
   const dateInput = document.querySelector('input[name="date_"]');
   const shiftInfoBlock = document.getElementById("shift-info");
   const employeeList = document.getElementById("shift-employees");
@@ -106,7 +234,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Загрузить при загрузке страницы, если дата уже выбрана
   if (dateInput.value) {
     loadShiftInfo(dateInput.value);
   }

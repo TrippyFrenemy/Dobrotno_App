@@ -64,7 +64,23 @@
       <td class="p-2 border">{{ order.date | e }}</td>
       <td class="p-2 border">{{ order.phone_number | e }}</td>
       <td class="p-2 border">{{ order.amount | e }} грн</td>
-      <td class="p-2 border">{{ order.order_type.name | e if order.order_type else "-" }}</td>
+      <td class="p-2 border">
+        {% if order.order_order_types %}
+          {# Новая схема: несколько типов #}
+          {% for oot in order.order_order_types %}
+            <div class="text-xs">
+              <span class="font-medium">{{ oot.order_type.name | e if oot.order_type else "?" }}</span>:
+              <span class="text-gray-700">{{ oot.amount | e }} грн</span>
+            </div>
+          {% endfor %}
+        {% elif order.order_type %}
+          {# Старая схема: один тип #}
+          {{ order.order_type.name | e }}
+        {% else %}
+          {# Без типа #}
+          <span class="text-gray-400">-</span>
+        {% endif %}
+      </td>
       {% if user.role == 'admin' %}
         <td class="p-2 border">{{ order.created_by_user.name | e if order.created_by_user else "-" }}</td>
       {% endif %}
