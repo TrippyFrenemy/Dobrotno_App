@@ -157,7 +157,6 @@ async def create_order(
     await session.flush()  # Получаем ID заказа
 
     # Создаем связи с типами
-    from src.tiktok.orders.models import OrderOrderType
     for item in order_types_data:
         order_order_type = OrderOrderType(
             order_id=new_order.id,
