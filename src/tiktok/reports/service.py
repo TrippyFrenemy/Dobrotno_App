@@ -185,10 +185,13 @@ async def get_monthly_report(
             for uid, order_data in day_orders.items():
                 user = users.get(uid)
                 if user:
+                    # Возвраты менеджера = персональные + доля от нераспределённых
+                    manager_returns = day_returns_by_manager.get(uid, Decimal('0')) + unassigned_per_manager
                     orders_by_creator[uid] = {
                         'name': user.name,
                         'amount': order_data['amount'],
-                        'count': len(order_data['orders'])
+                        'count': len(order_data['orders']),
+                        'returns': manager_returns
                     }
 
         fixed = defaultdict(Decimal)
@@ -354,7 +357,7 @@ def summarize_period(days: list[dict], payouts: dict[int, Decimal]):
     # Агрегация по типам заказов
     types_acc = defaultdict(lambda: {"amount": Decimal("0"), "count": 0})
     # Агрегация по создателям
-    creators_acc = defaultdict(lambda: {"name": "", "amount": Decimal("0"), "count": 0})
+    creators_acc = defaultdict(lambda: {"name": "", "amount": Decimal("0"), "count": 0, "returns": Decimal("0")})
 
     for day in days:
         total_orders += day["orders"]
@@ -377,6 +380,7 @@ def summarize_period(days: list[dict], payouts: dict[int, Decimal]):
             creators_acc[uid]["name"] = creator_data["name"]
             creators_acc[uid]["amount"] += creator_data["amount"]
             creators_acc[uid]["count"] += creator_data["count"]
+            creators_acc[uid]["returns"] += creator_data.get("returns", Decimal("0"))
 
     salaries = []
     for uid, parts in salary_acc.items():
@@ -404,7 +408,7 @@ def summarize_period(days: list[dict], payouts: dict[int, Decimal]):
     ]
 
     creators_breakdown = [
-        {"user_id": uid, "name": data["name"], "amount": data["amount"], "count": data["count"]}
+        {"user_id": uid, "name": data["name"], "amount": data["amount"], "count": data["count"], "returns": data["returns"]}
         for uid, data in sorted(creators_acc.items(), key=lambda x: x[1]["amount"], reverse=True)
     ]
 
