@@ -23,11 +23,30 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Связанный заказ (необязательно)</label>
-      <select name="order_id" id="orderSelect" class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
-        <option value="">Не указан</option>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Связанный заказ <span class="text-red-500">*</span></label>
+
+      <!-- Поиск и сортировка -->
+      <div class="mb-2 flex gap-2">
+        <input type="text" id="phoneSearch" placeholder="🔍 Поиск по телефону..." class="flex-1 border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
+        <select id="orderSort" class="border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500">
+          <option value="date_desc">По дате (новые)</option>
+          <option value="date_asc">По дате (старые)</option>
+          <option value="amount_desc">По сумме (больше)</option>
+          <option value="amount_asc">По сумме (меньше)</option>
+          <option value="created_desc">По созданию (новые)</option>
+          <option value="created_asc">По созданию (старые)</option>
+        </select>
+      </div>
+
+      <select name="order_id" id="orderSelect" required class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500" size="8">
+        <option value="">Выберите заказ</option>
         {% for order in orders %}
-        <option value="{{ order.id }}" data-order-date="{{ order.date }}" {% if ret.order_id == order.id %}selected{% endif %}>
+        <option value="{{ order.id }}"
+                data-order-date="{{ order.date.isoformat() }}"
+                data-phone="{{ order.phone_number }}"
+                data-amount="{{ order.amount }}"
+                data-created="{{ order.created_at.isoformat() if order.created_at else '' }}"
+                {% if ret.order_id == order.id %}selected{% endif %}>
           Заказ #{{ order.id }} - {{ order.date }} - {{ order.phone_number }} - {{ order.amount }} грн ({{ order.created_by_user.name }})
         </option>
         {% endfor %}
@@ -72,42 +91,89 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMessage = document.getElementById("errorMessage");
   const returnDateInput = document.getElementById("returnDate");
   const orderSelect = document.getElementById("orderSelect");
-  
+  const phoneSearch = document.getElementById("phoneSearch");
+  const orderSort = document.getElementById("orderSort");
+
   // Сохраняем все опции заказов
-  const allOrderOptions = Array.from(orderSelect.options).slice(1); // Убираем первую опцию "Не указан"
+  const allOrderOptions = Array.from(orderSelect.options).slice(1); // Убираем первую опцию "Выберите заказ"
 
-  // Фильтрация заказов по выбранной дате
-  returnDateInput.addEventListener("change", () => {
+  // Функция сортировки массива опций
+  const sortOptions = (options, sortType) => {
+    return options.sort((a, b) => {
+      switch(sortType) {
+        case 'date_desc':
+          return b.dataset.orderDate.localeCompare(a.dataset.orderDate);
+        case 'date_asc':
+          return a.dataset.orderDate.localeCompare(b.dataset.orderDate);
+        case 'amount_desc':
+          return parseFloat(b.dataset.amount) - parseFloat(a.dataset.amount);
+        case 'amount_asc':
+          return parseFloat(a.dataset.amount) - parseFloat(b.dataset.amount);
+        case 'created_desc':
+          return (b.dataset.created || '').localeCompare(a.dataset.created || '');
+        case 'created_asc':
+          return (a.dataset.created || '').localeCompare(b.dataset.created || '');
+        default:
+          return 0;
+      }
+    });
+  };
+
+  // Функция фильтрации и отображения заказов
+  const filterAndDisplayOrders = () => {
     const selectedDate = returnDateInput.value;
+    const phoneQuery = phoneSearch.value.toLowerCase().trim();
+    const sortType = orderSort.value;
+    const currentSelection = orderSelect.value; // Сохраняем текущий выбор
 
-    // Удаляем все опции кроме первой ("Не указан")
+    // Удаляем все опции кроме первой ("Выберите заказ")
     while (orderSelect.options.length > 1) {
       orderSelect.remove(1);
     }
 
-    if (selectedDate) {
-      // Добавляем только заказы с выбранной датой
-      allOrderOptions.forEach(option => {
-        if (option.dataset.orderDate === selectedDate) {
-          orderSelect.appendChild(option.cloneNode(true));
-        }
-      });
-
-      // Если нет заказов на эту дату, показываем сообщение
-      if (orderSelect.options.length === 1) {
-        const noOrdersOption = document.createElement('option');
-        noOrdersOption.value = '';
-        noOrdersOption.textContent = 'Нет заказов на эту дату';
-        noOrdersOption.disabled = true;
-        orderSelect.appendChild(noOrdersOption);
+    // Фильтруем заказы
+    let filteredOptions = allOrderOptions.filter(option => {
+      // Фильтр по дате
+      if (selectedDate && option.dataset.orderDate !== selectedDate) {
+        return false;
       }
-    } else {
-      // Если дата не выбрана, показываем все заказы
-      allOrderOptions.forEach(option => {
+      // Фильтр по телефону
+      if (phoneQuery && !option.dataset.phone.toLowerCase().includes(phoneQuery)) {
+        return false;
+      }
+      return true;
+    });
+
+    // Сортируем отфильтрованные заказы
+    filteredOptions = sortOptions([...filteredOptions], sortType);
+
+    // Добавляем отсортированные и отфильтрованные заказы
+    if (filteredOptions.length > 0) {
+      filteredOptions.forEach(option => {
         orderSelect.appendChild(option.cloneNode(true));
       });
+    } else {
+      // Если нет подходящих заказов, показываем сообщение
+      const noOrdersOption = document.createElement('option');
+      noOrdersOption.value = '';
+      noOrdersOption.textContent = 'Нет заказов по заданным критериям';
+      noOrdersOption.disabled = true;
+      orderSelect.appendChild(noOrdersOption);
     }
-  });
+
+    // Восстанавливаем выбор, если он еще доступен
+    if (currentSelection) {
+      orderSelect.value = currentSelection;
+    }
+  };
+
+  // Обработчики событий
+  returnDateInput.addEventListener("change", filterAndDisplayOrders);
+  phoneSearch.addEventListener("input", filterAndDisplayOrders);
+  orderSort.addEventListener("change", filterAndDisplayOrders);
+
+  // Применяем фильтрацию сразу при загрузке страницы
+  filterAndDisplayOrders();
 });
 </script>
 {% endblock %}

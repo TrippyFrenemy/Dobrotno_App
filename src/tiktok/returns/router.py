@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy import insert, select, delete, extract, and_
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_CEILING, Decimal
 from typing import List, Optional
 
@@ -27,7 +27,9 @@ async def create_return_page(
     сsrf_token = await generate_csrf_token(user.id)
 
     # Загружаем последние заказы для выбора (опционально)
-    stmt_orders = select(Order).options(joinedload(Order.created_by_user)).order_by(Order.date.desc()).limit(100)
+    two_weeks_ago = date.today() - timedelta(days=14)
+    stmt_orders = select(Order).options(joinedload(Order.created_by_user)).order_by(Order.date.desc())
+    stmt_orders = stmt_orders.where(Order.date >= two_weeks_ago)
     result_orders = await session.execute(stmt_orders)
     orders = result_orders.scalars().all()
 
@@ -216,7 +218,9 @@ async def edit_return_page(
         raise HTTPException(status_code=404, detail="Возврат не найден")
 
     # Загружаем последние заказы для выбора (опционально)
-    stmt_orders = select(Order).options(joinedload(Order.created_by_user)).order_by(Order.date.desc()).limit(100)
+    two_weeks_ago = date.today() - timedelta(days=14)
+    stmt_orders = select(Order).options(joinedload(Order.created_by_user)).order_by(Order.date.desc())
+    stmt_orders = stmt_orders.where(Order.date >= two_weeks_ago)
     result_orders = await session.execute(stmt_orders)
     orders = result_orders.scalars().all()
 
