@@ -13,7 +13,7 @@ from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.tiktok.orders.models import Order, OrderOrderType
 from src.tiktok.order_types.models import OrderType, UserOrderTypeSetting
-from src.users.models import User
+from src.users.models import User, UserRole
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
 router = APIRouter()
@@ -45,7 +45,7 @@ async def create_order_page(
     for ot in order_types_db:
         setting = user_settings.get(ot.id)
         # Если есть настройка и is_allowed = False, пропускаем (для не-админов)
-        if user.role != "admin" and setting and not setting.is_allowed:
+        if user.role != UserRole.ADMIN and setting and not setting.is_allowed:
             continue
         order_types.append({"id": ot.id, "name": ot.name})
 
@@ -376,7 +376,7 @@ async def edit_order_page(
         # Иначе проверяем is_allowed (для не-админов)
         if ot.id in current_type_ids:
             order_types.append({"id": ot.id, "name": ot.name})
-        elif user.role != "admin" and setting and not setting.is_allowed:
+        elif user.role != UserRole.ADMIN and setting and not setting.is_allowed:
             continue
         else:
             order_types.append({"id": ot.id, "name": ot.name})
