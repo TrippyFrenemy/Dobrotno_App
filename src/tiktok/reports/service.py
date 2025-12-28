@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from collections import defaultdict
+from typing import Dict, Optional
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -11,6 +12,35 @@ from src.tiktok.returns.models import Return
 from src.tiktok.shifts.models import Shift, ShiftAssignment
 from src.users.models import User, UserRole
 from src.payouts.models import Payout, RoleType, Location
+from src.tiktok.order_types.models import OrderType, UserOrderTypeSetting
+
+
+def get_employee_percent_for_order_type(
+    user: User,
+    order_type: Optional[OrderType],
+    user_settings_map: Dict[tuple, UserOrderTypeSetting]
+) -> Decimal:
+    """
+    Получить процент для сотрудника с учётом приоритетов:
+    1. Индивидуальная настройка (UserOrderTypeSetting.custom_percent)
+    2. Процент по умолчанию для типа заказа (OrderType.default_employee_percent)
+    3. Процент по умолчанию для пользователя (User.default_percent)
+    """
+    if order_type is None:
+        # Заказ без типа — используем default_percent пользователя
+        return user.default_percent
+
+    # 1. Проверяем индивидуальную настройку
+    setting = user_settings_map.get((user.id, order_type.id))
+    if setting and setting.custom_percent is not None:
+        return setting.custom_percent
+
+    # 2. Проверяем процент по умолчанию для типа заказа
+    if order_type.default_employee_percent is not None:
+        return order_type.default_employee_percent
+
+    # 3. Fallback на процент пользователя
+    return user.default_percent
 
 
 def get_half_month_periods(month: int, year: int):
@@ -62,9 +92,15 @@ async def get_monthly_report(
     all_orders = orders_q.unique().scalars().all()
 
     # Загружаем все типы заказов для справочника
-    from src.tiktok.order_types.models import OrderType
     types_q = await session.execute(select(OrderType))
     order_types = {t.id: t for t in types_q.scalars().all()}
+
+    # Загружаем индивидуальные настройки типов заказов для пользователей
+    settings_q = await session.execute(select(UserOrderTypeSetting))
+    user_settings_map = {
+        (s.user_id, s.order_type_id): s
+        for s in settings_q.scalars().all()
+    }
 
     # Группируем заказы по дате и создателю
     orders_map = defaultdict(lambda: defaultdict(lambda: {'amount': Decimal('0'), 'orders': []}))
@@ -253,28 +289,42 @@ async def get_monthly_report(
                 fixed[uid] += user.default_rate
 
                 # Рассчитываем процент с учетом комиссии каждого типа заказа
-                total_commission_amount = Decimal('0')
+                # и индивидуальных процентов для типов
+                total_percent_amount = Decimal('0')
                 for order in order_data['orders']:
                     # НОВАЯ СХЕМА: несколько типов с распределением суммы
                     if order.order_order_types:
                         for order_type_link in order.order_order_types:
                             type_amount = order_type_link.amount
-                            commission = order_type_link.order_type.commission_percent if order_type_link.order_type else Decimal('100')
+                            order_type = order_type_link.order_type
+                            commission = order_type.commission_percent if order_type else Decimal('100')
                             order_profit = type_amount * commission / 100
-                            total_commission_amount += order_profit
+
+                            # Получаем процент для этого типа заказа с учётом приоритетов
+                            employee_percent = get_employee_percent_for_order_type(
+                                user, order_type, user_settings_map
+                            )
+                            total_percent_amount += order_profit * employee_percent / 100
                     # СТАРАЯ СХЕМА: один тип на весь заказ
                     elif order.order_type:
                         commission = order.order_type.commission_percent
                         order_profit = order.amount * commission / 100
-                        total_commission_amount += order_profit
+
+                        # Получаем процент для этого типа заказа с учётом приоритетов
+                        employee_percent = get_employee_percent_for_order_type(
+                            user, order.order_type, user_settings_map
+                        )
+                        total_percent_amount += order_profit * employee_percent / 100
                     # СОВСЕМ СТАРЫЕ ЗАКАЗЫ: без типа (100% комиссия)
                     else:
-                        total_commission_amount += order.amount
+                        # Для заказов без типа используем default_percent
+                        total_percent_amount += order.amount * user.default_percent / 100
 
                 # Вычитаем возвраты: персональные + равномерная доля от нераспределённых
+                # Возвраты вычитаются пропорционально default_percent (как было раньше)
                 manager_returns = day_returns_by_manager.get(uid, Decimal('0')) + unassigned_per_manager
-                manager_profit = total_commission_amount - manager_returns
-                percent[uid] += round(manager_profit * user.default_percent / 100)
+                returns_deduction = manager_returns * user.default_percent / 100
+                percent[uid] += round(total_percent_amount - returns_deduction)
     
         # Статистика по создателям (менеджерам)
         # Для MANAGER этот блок скрываем полностью (таблица "💼 Касса по менеджерам" не отображается).

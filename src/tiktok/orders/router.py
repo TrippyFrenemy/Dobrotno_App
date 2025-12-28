@@ -12,7 +12,7 @@ from src.tiktok.shifts.models import Shift
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.tiktok.orders.models import Order, OrderOrderType
-from src.tiktok.order_types.models import OrderType
+from src.tiktok.order_types.models import OrderType, UserOrderTypeSetting
 from src.users.models import User
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
@@ -32,8 +32,22 @@ async def create_order_page(
     result = await session.execute(stmt)
     order_types_db = result.scalars().all()
 
-    # Конвертируем в словари для JSON сериализации
-    order_types = [{"id": ot.id, "name": ot.name} for ot in order_types_db]
+    # Получаем настройки пользователя для типов заказов (для фильтрации запрещённых)
+    settings_stmt = select(UserOrderTypeSetting).where(
+        UserOrderTypeSetting.user_id == user.id
+    )
+    settings_result = await session.execute(settings_stmt)
+    user_settings = {s.order_type_id: s for s in settings_result.scalars().all()}
+
+    # Фильтруем типы заказов: убираем те, где is_allowed = False
+    # Админ видит все типы (для него ограничения не применяются)
+    order_types = []
+    for ot in order_types_db:
+        setting = user_settings.get(ot.id)
+        # Если есть настройка и is_allowed = False, пропускаем (для не-админов)
+        if user.role != "admin" and setting and not setting.is_allowed:
+            continue
+        order_types.append({"id": ot.id, "name": ot.name})
 
     return templates.TemplateResponse("tiktok/orders/create.html", {
         "request": request,
@@ -340,8 +354,32 @@ async def edit_order_page(
     types_result = await session.execute(types_stmt)
     order_types_db = types_result.scalars().all()
 
-    # Конвертируем в словари для JSON сериализации
-    order_types = [{"id": ot.id, "name": ot.name} for ot in order_types_db]
+    # Получаем настройки пользователя для типов заказов
+    settings_stmt = select(UserOrderTypeSetting).where(
+        UserOrderTypeSetting.user_id == user.id
+    )
+    settings_result = await session.execute(settings_stmt)
+    user_settings = {s.order_type_id: s for s in settings_result.scalars().all()}
+
+    # Собираем ID текущих типов заказа (они должны отображаться даже если запрещены)
+    current_type_ids = set()
+    if order.order_order_types:
+        current_type_ids = {oot.order_type_id for oot in order.order_order_types}
+    elif order.type_id:
+        current_type_ids = {order.type_id}
+
+    # Фильтруем типы заказов: убираем запрещённые (кроме уже выбранных)
+    order_types = []
+    for ot in order_types_db:
+        setting = user_settings.get(ot.id)
+        # Если тип уже выбран в заказе — показываем его
+        # Иначе проверяем is_allowed (для не-админов)
+        if ot.id in current_type_ids:
+            order_types.append({"id": ot.id, "name": ot.name})
+        elif user.role != "admin" and setting and not setting.is_allowed:
+            continue
+        else:
+            order_types.append({"id": ot.id, "name": ot.name})
 
     # Подготавливаем текущие типы для отображения
     current_types = []
