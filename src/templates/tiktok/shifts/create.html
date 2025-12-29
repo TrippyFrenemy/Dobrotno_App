@@ -17,6 +17,19 @@
       {% endfor %}
     </select>
 
+    {% if branches and branches|length > 1 %}
+    <label>TikTok точка</label>
+    <select name="branch_id" class="border p-2 rounded">
+      {% for branch in branches %}
+      <option value="{{ branch.id }}" {% if branch.id == selected_branch_id %}selected{% endif %}>
+        {{ branch.name }}{% if branch.is_default %} (главная){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    {% elif branches and branches|length == 1 %}
+    <input type="hidden" name="branch_id" value="{{ branches[0].id }}">
+    {% endif %}
+
     <label>Сотрудники</label>
     <select name="employees" multiple required class="border p-2 rounded h-40" id="employee-select">
       {% for u in users %}

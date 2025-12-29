@@ -13,6 +13,7 @@ from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.tiktok.orders.models import Order, OrderOrderType
 from src.tiktok.order_types.models import OrderType, UserOrderTypeSetting
+from src.tiktok.branches.models import TikTokBranch, UserBranchAssignment, OrderTypeBranch
 from src.users.models import User, UserRole
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
@@ -22,10 +23,42 @@ templates = Jinja2Templates(directory="src/templates")
 @router.get("/create", response_class=HTMLResponse)
 async def create_order_page(
     request: Request,
+    branch_id: Optional[int] = Query(None),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin)
 ):
     csrf_token = await generate_csrf_token(user.id)
+
+    # Загружаем активные точки
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    all_branches = branches_result.scalars().all()
+
+    # Проверяем доступ пользователя к точкам
+    user_branch_stmt = select(UserBranchAssignment).where(UserBranchAssignment.user_id == user.id)
+    user_branch_result = await session.execute(user_branch_stmt)
+    user_branch_assignments = {a.branch_id: a for a in user_branch_result.scalars().all()}
+
+    # Фильтруем точки для не-админов
+    branches = []
+    default_branch_id = None
+    for b in all_branches:
+        assignment = user_branch_assignments.get(b.id)
+        # Админ видит все точки
+        if user.role == UserRole.ADMIN:
+            branches.append({"id": b.id, "name": b.name, "is_default": b.is_default})
+            if b.is_default:
+                default_branch_id = b.id
+        elif assignment is None or assignment.is_allowed:
+            # Нет настройки или разрешена
+            branches.append({"id": b.id, "name": b.name, "is_default": b.is_default})
+            if assignment and assignment.is_primary:
+                default_branch_id = b.id
+            elif b.is_default and default_branch_id is None:
+                default_branch_id = b.id
+
+    # Используем переданный branch_id или default
+    selected_branch_id = branch_id or default_branch_id
 
     # Получаем активные типы заказов
     stmt = select(OrderType).where(OrderType.is_active == True).order_by(OrderType.name)
@@ -39,20 +72,36 @@ async def create_order_page(
     settings_result = await session.execute(settings_stmt)
     user_settings = {s.order_type_id: s for s in settings_result.scalars().all()}
 
+    # Получаем привязки типов к точкам (для фильтрации по точке)
+    branch_type_stmt = select(OrderTypeBranch)
+    branch_type_result = await session.execute(branch_type_stmt)
+    branch_type_assignments = {}
+    for a in branch_type_result.scalars().all():
+        branch_type_assignments[(a.order_type_id, a.branch_id)] = a
+
     # Фильтруем типы заказов: убираем те, где is_allowed = False
-    # Админ видит все типы (для него ограничения не применяются)
+    # и учитываем привязку к точке
     order_types = []
     for ot in order_types_db:
+        # Проверяем персональную настройку пользователя
         setting = user_settings.get(ot.id)
-        # Если есть настройка и is_allowed = False, пропускаем (для не-админов)
         if user.role != UserRole.ADMIN and setting and not setting.is_allowed:
             continue
+
+        # Проверяем привязку типа к точке
+        if selected_branch_id:
+            branch_type = branch_type_assignments.get((ot.id, selected_branch_id))
+            if branch_type and not branch_type.is_allowed:
+                continue
+
         order_types.append({"id": ot.id, "name": ot.name})
 
     return templates.TemplateResponse("tiktok/orders/create.html", {
         "request": request,
         "csrf_token": csrf_token,
-        "order_types": order_types
+        "order_types": order_types,
+        "branches": branches,
+        "selected_branch_id": selected_branch_id
     })
 
 @router.post("/create")
@@ -61,6 +110,7 @@ async def create_order(
     phone_number: str = Form(...),
     date_: date = Form(...),
     amount: Decimal = Form(...),
+    branch_id: Optional[int] = Form(None),
     csrf_token: str = Form(...),
     confirm: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_async_session),
@@ -165,7 +215,8 @@ async def create_order(
         date=date_,
         amount=amount,
         type_id=None,  # Новые заказы не используют старую схему
-        created_by=user.id
+        created_by=user.id,
+        branch_id=branch_id
     )
     session.add(new_order)
     await session.flush()  # Получаем ID заказа

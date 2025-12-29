@@ -21,6 +21,7 @@ from src.auth.router import router as auth_router
 from src.users.router import router as users_router
 from src.tiktok.router import router as tiktok_router
 from src.tiktok.order_types.router import router as order_types_router
+from src.tiktok.branches.router import router as branches_router
 from src.cafe.router import router as coffee_router
 from src.logs.router import router as logs_router
 from src.stores.router import router as stores_router
@@ -100,6 +101,11 @@ app.include_router(
 app.include_router(
     router=order_types_router,
     tags=["OrderTypes"],
+)
+
+app.include_router(
+    router=branches_router,
+    tags=["TikTok Branches"],
 )
 
 app.include_router(

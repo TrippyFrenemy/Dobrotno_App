@@ -24,7 +24,10 @@ class OrderOrderType(Base):
 
 class Order(Base):
     __tablename__ = "orders"
-    __table_args__ = (Index("ix_orders_date_created_by", "date", "created_by"),)
+    __table_args__ = (
+        Index("ix_orders_date_created_by", "date", "created_by"),
+        Index("ix_orders_branch_id", "branch_id"),
+    )
     id = Column(Integer, primary_key=True)
     date = Column(Date, nullable=False)
     phone_number = Column(String, nullable=False)
@@ -32,7 +35,10 @@ class Order(Base):
     created_at = Column(DateTime, default=datetime.now, server_default=text("now()"))
     created_by = Column(ForeignKey("users.id"))
     type_id = Column(ForeignKey("order_types.id"), nullable=True)  # Оставляем для обратной совместимости
+    # TikTok точка (nullable для обратной совместимости, NULL = главная точка)
+    branch_id = Column(Integer, ForeignKey("tiktok_branches.id", ondelete="SET NULL"), nullable=True)
 
     created_by_user = relationship("User", backref="orders", lazy="joined")
     order_type = relationship("OrderType", foreign_keys=[type_id], lazy="joined")  # Старая схема
     order_order_types = relationship("OrderOrderType", back_populates="order", lazy="selectin", cascade="all, delete-orphan")  # Новая схема - selectin избегает дубликатов
+    branch = relationship("TikTokBranch", backref="orders")

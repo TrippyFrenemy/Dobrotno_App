@@ -13,6 +13,7 @@ from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.users.models import User, UserRole
 from src.tiktok.shifts.models import Shift, ShiftAssignment, ShiftLocation
+from src.tiktok.branches.models import TikTokBranch, UserBranchAssignment
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 
 router = APIRouter(tags=["Shifts"])
@@ -21,10 +22,11 @@ templates = Jinja2Templates(directory="src/templates")
 # 🧾 Страница создания смены
 @router.get("/create", response_class=HTMLResponse)
 async def create_shift_page(
-    request: Request, 
-    user: User = Depends(get_manager_or_admin), 
+    request: Request,
+    user: User = Depends(get_manager_or_admin),
     session: AsyncSession = Depends(get_async_session),
-    date: Optional[date] = Query(None)
+    date: Optional[date] = Query(None),
+    branch_id: Optional[int] = Query(None)
 ):
     csrf_token = await generate_csrf_token(user.id)
 
@@ -32,15 +34,46 @@ async def create_shift_page(
         select(User).where(User.is_active == True, User.role == UserRole.EMPLOYEE)
     )
     users = result.scalars().all()
+
+    # Загружаем активные точки
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    all_branches = branches_result.scalars().all()
+
+    # Проверяем доступ пользователя к точкам
+    user_branch_stmt = select(UserBranchAssignment).where(UserBranchAssignment.user_id == user.id)
+    user_branch_result = await session.execute(user_branch_stmt)
+    user_branch_assignments = {a.branch_id: a for a in user_branch_result.scalars().all()}
+
+    # Фильтруем точки для не-админов
+    branches = []
+    default_branch_id = None
+    for b in all_branches:
+        assignment = user_branch_assignments.get(b.id)
+        if user.role == UserRole.ADMIN:
+            branches.append({"id": b.id, "name": b.name, "is_default": b.is_default})
+            if b.is_default:
+                default_branch_id = b.id
+        elif assignment is None or assignment.is_allowed:
+            branches.append({"id": b.id, "name": b.name, "is_default": b.is_default})
+            if assignment and assignment.is_primary:
+                default_branch_id = b.id
+            elif b.is_default and default_branch_id is None:
+                default_branch_id = b.id
+
+    selected_branch_id = branch_id or default_branch_id
+
     return templates.TemplateResponse(
-        "tiktok/shifts/create.html", 
+        "tiktok/shifts/create.html",
         {
-            "request": request, 
-            "user": user, 
-            "users": users, 
-            "locations": list(ShiftLocation), 
-            "prefill_date": date, 
-            "csrf_token": csrf_token
+            "request": request,
+            "user": user,
+            "users": users,
+            "locations": list(ShiftLocation),
+            "prefill_date": date,
+            "csrf_token": csrf_token,
+            "branches": branches,
+            "selected_branch_id": selected_branch_id
         }
     )
 
@@ -51,6 +84,7 @@ async def create_shift(
     date_: date = Form(...),
     location: ShiftLocation = Form(...),
     employees: List[int] = Form(...),
+    branch_id: Optional[int] = Form(None),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_manager_or_admin)
@@ -66,13 +100,18 @@ async def create_shift(
     if location == ShiftLocation.tiktok and len(employees) > 2:
         raise HTTPException(status_code=400, detail="В TikTok смене максимум 2 сотрудника")
 
-    stmt = select(Shift).where(Shift.date == date_, Shift.location == location)
+    # Проверяем уникальность смены (дата + локация + точка)
+    stmt = select(Shift).where(
+        Shift.date == date_,
+        Shift.location == location,
+        Shift.branch_id == branch_id
+    )
     result = await session.execute(stmt)
     if result.scalar():
-        raise HTTPException(status_code=400, detail="Смена на эту дату и локацию уже существует")
+        raise HTTPException(status_code=400, detail="Смена на эту дату, локацию и точку уже существует")
 
     # 🏗️ Создаём саму смену
-    shift = Shift(date=date_, location=location, created_by=current_user.id)
+    shift = Shift(date=date_, location=location, created_by=current_user.id, branch_id=branch_id)
     session.add(shift)
     await session.flush()  # получаем shift.id
 

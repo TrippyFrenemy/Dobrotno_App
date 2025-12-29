@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{% if branch %}Редактировать точку{% else %}Создать точку{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-semibold mb-6">
+      {% if branch %}Редактировать точку: {{ branch.name }}{% else %}Создать новую точку{% endif %}
+    </h2>
+
+    <form method="post" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div>
+        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
+          Название точки
+        </label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          value="{{ branch.name if branch else '' }}"
+          required
+          placeholder="TikTok Центр"
+          class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
+      <div class="flex items-center gap-6">
+        <div class="flex items-center">
+          <input
+            type="checkbox"
+            id="is_active"
+            name="is_active"
+            {% if branch is none or branch.is_active %}checked{% endif %}
+            class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label for="is_active" class="ml-2 text-gray-700">
+            Активна
+          </label>
+        </div>
+
+        <div class="flex items-center">
+          <input
+            type="checkbox"
+            id="is_default"
+            name="is_default"
+            {% if branch and branch.is_default %}checked{% endif %}
+            class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label for="is_default" class="ml-2 text-gray-700">
+            Главная точка
+          </label>
+        </div>
+      </div>
+
+      <p class="text-sm text-gray-500">
+        Главная точка используется по умолчанию для старых данных без привязки.
+      </p>
+
+      <div class="flex gap-3 pt-4">
+        <button
+          type="submit"
+          class="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-medium transition-colors"
+        >
+          {% if branch %}Сохранить{% else %}Создать{% endif %}
+        </button>
+        <a
+          href="/branches/"
+          class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 font-medium text-center transition-colors"
+        >
+          Отмена
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

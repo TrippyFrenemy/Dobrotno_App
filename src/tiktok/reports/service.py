@@ -13,24 +13,55 @@ from src.tiktok.shifts.models import Shift, ShiftAssignment
 from src.users.models import User, UserRole
 from src.payouts.models import Payout, RoleType, Location
 from src.tiktok.order_types.models import OrderType, UserOrderTypeSetting
+from src.tiktok.branches.models import TikTokBranch, UserBranchAssignment
+
+
+def get_employee_percent_for_branch(
+    user: User,
+    branch_id: Optional[int],
+    branch_assignments_map: Dict[tuple, UserBranchAssignment]
+) -> Decimal:
+    """
+    Получить процент для сотрудника на конкретной точке.
+    Приоритет:
+    1. UserBranchAssignment.custom_percent (если задан)
+    2. User.default_percent
+    """
+    if branch_id is None:
+        return user.default_percent
+
+    assignment = branch_assignments_map.get((user.id, branch_id))
+    if assignment and assignment.custom_percent is not None:
+        return assignment.custom_percent
+
+    return user.default_percent
 
 
 def get_employee_percent_for_order_type(
     user: User,
     order_type: Optional[OrderType],
-    user_settings_map: Dict[tuple, UserOrderTypeSetting]
+    user_settings_map: Dict[tuple, UserOrderTypeSetting],
+    branch_id: Optional[int] = None,
+    branch_assignments_map: Optional[Dict[tuple, UserBranchAssignment]] = None
 ) -> Decimal:
     """
     Получить процент для сотрудника с учётом приоритетов:
     1. Индивидуальная настройка (UserOrderTypeSetting.custom_percent)
     2. Процент по умолчанию для типа заказа (OrderType.default_employee_percent)
-    3. Процент по умолчанию для пользователя (User.default_percent)
+    3. Индивидуальный процент для точки (UserBranchAssignment.custom_percent)
+    4. Процент по умолчанию для пользователя (User.default_percent)
     """
-    if order_type is None:
-        # Заказ без типа — используем default_percent пользователя
-        return user.default_percent
+    # Базовый процент с учётом точки
+    if branch_id and branch_assignments_map:
+        base_percent = get_employee_percent_for_branch(user, branch_id, branch_assignments_map)
+    else:
+        base_percent = user.default_percent
 
-    # 1. Проверяем индивидуальную настройку
+    if order_type is None:
+        # Заказ без типа — используем базовый процент
+        return base_percent
+
+    # 1. Проверяем индивидуальную настройку для типа заказа
     setting = user_settings_map.get((user.id, order_type.id))
     if setting and setting.custom_percent is not None:
         return setting.custom_percent
@@ -39,8 +70,8 @@ def get_employee_percent_for_order_type(
     if order_type.default_employee_percent is not None:
         return order_type.default_employee_percent
 
-    # 3. Fallback на процент пользователя
-    return user.default_percent
+    # 3. Fallback на базовый процент (точки или пользователя)
+    return base_percent
 
 
 def get_half_month_periods(month: int, year: int):
@@ -74,14 +105,27 @@ async def get_monthly_report(
     session: AsyncSession,
     start: date,
     end: date,
-    current_user: User
+    current_user: User,
+    branch_id: Optional[int] = None
 ):
+    """
+    Получить отчёт за период.
 
+    Args:
+        branch_id: ID точки для фильтрации. None = все точки (совместимость со старыми данными).
+    """
     users_q = await session.execute(select(User))
     users = {u.id: u for u in users_q.scalars().all()}
 
+    # Загружаем привязки пользователей к точкам
+    branch_assignments_q = await session.execute(select(UserBranchAssignment))
+    branch_assignments_map = {
+        (a.user_id, a.branch_id): a
+        for a in branch_assignments_q.scalars().all()
+    }
+
     # Загружаем все заказы с типами для учета комиссии (поддержка обеих схем)
-    orders_q = await session.execute(
+    orders_stmt = (
         select(Order)
         .where(Order.date >= start, Order.date <= end)
         .options(
@@ -89,6 +133,11 @@ async def get_monthly_report(
             selectinload(Order.order_order_types).selectinload(OrderOrderType.order_type)  # Новая схема (many-to-many)
         )
     )
+    # Фильтрация по точке
+    if branch_id is not None:
+        orders_stmt = orders_stmt.where(Order.branch_id == branch_id)
+
+    orders_q = await session.execute(orders_stmt)
     all_orders = orders_q.unique().scalars().all()
 
     # Загружаем все типы заказов для справочника
@@ -172,11 +221,16 @@ async def get_monthly_report(
                 penalties_map_by_date[ret.date][int(user_id_str)] += Decimal(str(penalty_amount))
 
     # Все смены с назначениями
-    shifts_q = await session.execute(
+    shifts_stmt = (
         select(Shift)
         .where(Shift.date >= start, Shift.date <= end)
         .options(selectinload(Shift.assignments).selectinload(ShiftAssignment.user))
     )
+    # Фильтрация по точке
+    if branch_id is not None:
+        shifts_stmt = shifts_stmt.where(Shift.branch_id == branch_id)
+
+    shifts_q = await session.execute(shifts_stmt)
     shifts_by_date = defaultdict(list)
     for shift in shifts_q.scalars().all():
         shifts_by_date[shift.date].append(shift)
@@ -275,7 +329,10 @@ async def get_monthly_report(
                 for a in assignments:
                     # Используем employee_cashbox (только типы с include_in_employee_salary=True)
                     cashbox_perc = employee_cashbox / len(employee_details) if employee_details else Decimal('0')
-                    percent[a.user_id] += round((cashbox_perc * a.user.default_percent) / 100)
+                    # Используем процент с учётом точки смены
+                    shift_branch_id = shift.branch_id or branch_id
+                    emp_percent = get_employee_percent_for_branch(a.user, shift_branch_id, branch_assignments_map)
+                    percent[a.user_id] += round((cashbox_perc * emp_percent) / 100)
             else:
                 for a in assignments:
                     fixed[a.user_id] += Decimal(a.salary)
@@ -314,6 +371,8 @@ async def get_monthly_report(
                 # и индивидуальных процентов для типов
                 total_percent_amount = Decimal('0')
                 for order in order_data['orders']:
+                    # branch_id заказа (может быть None для старых данных)
+                    order_branch_id = order.branch_id or branch_id
                     # НОВАЯ СХЕМА: несколько типов с распределением суммы
                     if order.order_order_types:
                         for order_type_link in order.order_order_types:
@@ -324,7 +383,8 @@ async def get_monthly_report(
 
                             # Получаем процент для этого типа заказа с учётом приоритетов
                             employee_percent = get_employee_percent_for_order_type(
-                                user, order_type, user_settings_map
+                                user, order_type, user_settings_map,
+                                order_branch_id, branch_assignments_map
                             )
                             total_percent_amount += order_profit * employee_percent / 100
                     # СТАРАЯ СХЕМА: один тип на весь заказ
@@ -334,18 +394,23 @@ async def get_monthly_report(
 
                         # Получаем процент для этого типа заказа с учётом приоритетов
                         employee_percent = get_employee_percent_for_order_type(
-                            user, order.order_type, user_settings_map
+                            user, order.order_type, user_settings_map,
+                            order_branch_id, branch_assignments_map
                         )
                         total_percent_amount += order_profit * employee_percent / 100
                     # СОВСЕМ СТАРЫЕ ЗАКАЗЫ: без типа (100% комиссия)
                     else:
-                        # Для заказов без типа используем default_percent
-                        total_percent_amount += order.amount * user.default_percent / 100
+                        # Для заказов без типа используем базовый процент (с учётом точки)
+                        base_percent = get_employee_percent_for_branch(
+                            user, order_branch_id, branch_assignments_map
+                        )
+                        total_percent_amount += order.amount * base_percent / 100
 
                 # Вычитаем возвраты: персональные + равномерная доля от нераспределённых
-                # Возвраты вычитаются пропорционально default_percent (как было раньше)
+                # Возвраты вычитаются пропорционально базовому проценту (с учётом точки)
                 manager_returns = day_returns_by_manager.get(uid, Decimal('0')) + unassigned_per_manager
-                returns_deduction = manager_returns * user.default_percent / 100
+                base_percent = get_employee_percent_for_branch(user, branch_id, branch_assignments_map)
+                returns_deduction = manager_returns * base_percent / 100
                 percent[uid] += round(total_percent_amount - returns_deduction)
     
         # Статистика по создателям (менеджерам)
