@@ -1,4 +1,4 @@
-"""Add user_order_type_settings table and default_employee_percent to order_types
+"""Add user_order_type_settings table and order type settings to order_types
 
 Revision ID: user_order_type_settings
 Revises: 32725b23b9d6
@@ -26,6 +26,12 @@ def upgrade() -> None:
         sa.Column('default_employee_percent', sa.Numeric(precision=10, scale=2), nullable=True)
     )
 
+    # Добавляем колонку include_in_employee_salary в order_types
+    # True = включать в кассу для сотрудников (default для обратной совместимости)
+    op.add_column('order_types',
+        sa.Column('include_in_employee_salary', sa.Boolean(), nullable=False, server_default='true')
+    )
+
     # Создаём таблицу user_order_type_settings для индивидуальных настроек
     op.create_table('user_order_type_settings',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -49,4 +55,5 @@ def downgrade() -> None:
     op.drop_index('ix_user_order_type_settings_user_id', table_name='user_order_type_settings')
     op.drop_index(op.f('ix_user_order_type_settings_id'), table_name='user_order_type_settings')
     op.drop_table('user_order_type_settings')
+    op.drop_column('order_types', 'include_in_employee_salary')
     op.drop_column('order_types', 'default_employee_percent')

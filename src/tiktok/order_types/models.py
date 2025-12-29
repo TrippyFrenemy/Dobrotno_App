@@ -15,6 +15,9 @@ class OrderType(Base):
     # Процент для сотрудников по умолчанию для этого типа заказа
     # NULL = использовать user.default_percent (обратная совместимость)
     default_employee_percent = Column(Numeric(10, 2), nullable=True)
+    # Учитывать ли этот тип заказа в расчёте ЗП сотрудников (Employee)
+    # True = включать в кассу для сотрудников, False = только для менеджеров
+    include_in_employee_salary = Column(Boolean, default=True, nullable=False)
 
     # Связь с индивидуальными настройками пользователей
     user_settings = relationship("UserOrderTypeSetting", back_populates="order_type", cascade="all, delete-orphan")

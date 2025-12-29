@@ -412,6 +412,9 @@ async def update_order_type_settings(
     else:
         order_type.default_employee_percent = None
 
+    # Обновляем include_in_employee_salary
+    order_type.include_in_employee_salary = form_data.get("include_in_employee_salary") == "on"
+
     # Обновляем индивидуальные настройки для каждого пользователя
     # Формат: user_{user_id}_percent, user_{user_id}_allowed
     processed_user_ids = set()

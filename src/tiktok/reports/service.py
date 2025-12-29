@@ -192,6 +192,27 @@ async def get_monthly_report(
         total_orders = sum(order_data['amount'] for order_data in day_orders.values())
         cashbox = total_orders - returns
 
+        # Рассчитываем кассу для сотрудников (только типы с include_in_employee_salary=True)
+        employee_orders_total = Decimal('0')
+        for uid, order_data in day_orders.items():
+            for order in order_data['orders']:
+                # НОВАЯ СХЕМА: несколько типов
+                if order.order_order_types:
+                    for order_type_link in order.order_order_types:
+                        ot = order_type_link.order_type
+                        # Включаем только если include_in_employee_salary=True (или если типа нет)
+                        if ot is None or ot.include_in_employee_salary:
+                            employee_orders_total += order_type_link.amount
+                # СТАРАЯ СХЕМА: один тип
+                elif order.type_id and order.type_id in order_types:
+                    ot = order_types[order.type_id]
+                    if ot.include_in_employee_salary:
+                        employee_orders_total += order.amount
+                # БЕЗ ТИПА — включаем (обратная совместимость)
+                else:
+                    employee_orders_total += order.amount
+        employee_cashbox = employee_orders_total - returns
+
         # Статистика по типам заказов (только для админов, менеджеры не видят)
         orders_by_type = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
         if current_user.role != UserRole.MANAGER:
@@ -252,7 +273,8 @@ async def get_monthly_report(
                     )
 
                 for a in assignments:
-                    cashbox_perc = cashbox / len(employee_details)
+                    # Используем employee_cashbox (только типы с include_in_employee_salary=True)
+                    cashbox_perc = employee_cashbox / len(employee_details) if employee_details else Decimal('0')
                     percent[a.user_id] += round((cashbox_perc * a.user.default_percent) / 100)
             else:
                 for a in assignments:
