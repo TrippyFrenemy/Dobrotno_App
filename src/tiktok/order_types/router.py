@@ -28,7 +28,12 @@ async def list_order_types(
     """Список всех типов заказов"""
     csrf_token = await generate_csrf_token(current_user.id)
 
-    stmt = select(OrderType).order_by(OrderType.name)
+    # Для менеджеров показываем только активные типы, для админов - все
+    if current_user.role == UserRole.ADMIN:
+        stmt = select(OrderType).order_by(OrderType.name)
+    else:
+        stmt = select(OrderType).where(OrderType.is_active == True).order_by(OrderType.name)
+
     result = await session.execute(stmt)
     order_types = result.scalars().all()
 
