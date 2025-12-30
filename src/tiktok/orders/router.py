@@ -248,6 +248,7 @@ async def list_orders_all(
     month: Optional[int] = Query(date.today().month),
     year: Optional[int] = Query(date.today().year),
     type_id: Optional[str] = Query(None),
+    branch_id: Optional[int] = Query(None),
     sort_by: str = Query("date_desc"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_admin_user),
@@ -265,10 +266,15 @@ async def list_orders_all(
     if type_id_int is not None:
         filters.append(Order.type_id == type_id_int)
 
+    # Фильтр по точке
+    if branch_id is not None:
+        filters.append(Order.branch_id == branch_id)
+
     stmt = select(Order).where(and_(*filters)).options(
         joinedload(Order.created_by_user),
         joinedload(Order.order_type),
-        joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type)
+        joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type),
+        joinedload(Order.branch)
     ).execution_options(populate_existing=True)
 
     # Применяем сортировку
@@ -295,6 +301,11 @@ async def list_orders_all(
     types_result = await session.execute(types_stmt)
     order_types = types_result.scalars().all()
 
+    # Загружаем все точки для фильтра
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    branches = branches_result.scalars().all()
+
     return templates.TemplateResponse("tiktok/orders/list.html", {
         "request": request,
         "orders": orders,
@@ -303,8 +314,10 @@ async def list_orders_all(
         "month": month,
         "year": year,
         "type_id": type_id_int,
+        "branch_id": branch_id,
         "sort_by": sort_by,
         "order_types": order_types,
+        "branches": branches,
     })
 
 
@@ -316,11 +329,12 @@ async def list_orders_user(
     month: Optional[int] = Query(date.today().month),
     year: Optional[int] = Query(date.today().year),
     type_id: Optional[str] = Query(None),
+    branch_id: Optional[int] = Query(None),
     sort_by: str = Query("date_desc"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
-    if user.id != id and user.role != "admin":
+    if user.id != id and user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Нет доступа к чужим заказам")
 
     # Конвертируем type_id из строки в int (пустая строка -> None)
@@ -337,10 +351,15 @@ async def list_orders_user(
     if type_id_int is not None:
         filters.append(Order.type_id == type_id_int)
 
+    # Фильтр по точке
+    if branch_id is not None:
+        filters.append(Order.branch_id == branch_id)
+
     stmt = select(Order).where(and_(*filters)).options(
         joinedload(Order.created_by_user),
         joinedload(Order.order_type),
-        joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type)
+        joinedload(Order.order_order_types).joinedload(OrderOrderType.order_type),
+        joinedload(Order.branch)
     ).execution_options(populate_existing=True)
 
     # Применяем сортировку
@@ -367,6 +386,11 @@ async def list_orders_user(
     types_result = await session.execute(types_stmt)
     order_types = types_result.scalars().all()
 
+    # Загружаем все точки для фильтра
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    branches = branches_result.scalars().all()
+
     return templates.TemplateResponse("tiktok/orders/list.html", {
         "request": request,
         "orders": orders,
@@ -375,8 +399,10 @@ async def list_orders_user(
         "month": month,
         "year": year,
         "type_id": type_id_int,
+        "branch_id": branch_id,
         "sort_by": sort_by,
         "order_types": order_types,
+        "branches": branches,
     })
 
 
@@ -448,13 +474,19 @@ async def edit_order_page(
             "amount": float(order.amount)
         })
 
+    # Загружаем активные точки
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    branches = branches_result.scalars().all()
+
     return templates.TemplateResponse("tiktok/orders/edit.html", {
         "request": request,
         "order": order,
         "order_types": order_types,
         "current_types": current_types,
         "user": user,
-        "csrf_token": сsrf_token
+        "csrf_token": сsrf_token,
+        "branches": branches
     })
 
 
@@ -465,6 +497,7 @@ async def update_order(
     phone_number: str = Form(...),
     date_: date = Form(...),
     amount: Decimal = Form(...),
+    branch_id: Optional[int] = Form(None),
     csrf_token: str = Form(...),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
@@ -518,6 +551,7 @@ async def update_order(
     order.phone_number = phone_number
     order.date = date_
     order.amount = amount
+    order.branch_id = branch_id
 
     # МИГРАЦИЯ: обнуляем type_id (переходим на новую схему)
     order.type_id = None

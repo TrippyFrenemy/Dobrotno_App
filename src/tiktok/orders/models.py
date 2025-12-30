@@ -3,6 +3,9 @@ from sqlalchemy.orm import relationship
 from src.database import Base, metadata
 from datetime import datetime
 
+# Импорт для регистрации модели TikTokBranch в SQLAlchemy до использования ForeignKey
+from src.tiktok.branches.models import TikTokBranch  # noqa: F401
+
 
 class OrderOrderType(Base):
     """Связь заказа с типами (many-to-many) с распределением суммы"""

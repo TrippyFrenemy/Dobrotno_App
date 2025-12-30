@@ -12,6 +12,18 @@
     <input type="text" name="phone_number" value="{{ order.phone_number }}" required class="border p-2 rounded" />
     <input type="date" name="date_" value="{{ order.date }}" required class="border p-2 rounded" />
 
+    {% if branches and branches|length > 0 %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">TikTok точка</label>
+      <select name="branch_id" class="border p-2 rounded w-full">
+        <option value="">— Не выбрана —</option>
+        {% for branch in branches %}
+        <option value="{{ branch.id }}" {% if order.branch_id == branch.id %}selected{% endif %}>{{ branch.name | e }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">
         Общая сумма заказа (грн) <span class="text-red-500">*</span>

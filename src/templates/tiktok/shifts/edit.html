@@ -19,6 +19,16 @@
       {% endfor %}
     </select>
 
+    {% if branches and branches|length > 0 %}
+    <label>TikTok точка</label>
+    <select name="branch_id" class="border p-2 rounded">
+      <option value="">— Не выбрана —</option>
+      {% for branch in branches %}
+      <option value="{{ branch.id }}" {% if shift.branch_id == branch.id %}selected{% endif %}>{{ branch.name | e }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
     <label>Сотрудники</label>
     <select name="employees" multiple required class="border p-2 rounded h-40" id="employee-select">
       {% for u in users %}

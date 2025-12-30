@@ -26,6 +26,17 @@
       {% endfor %}
     </select>
   </div>
+  {% if branches and branches|length > 0 %}
+  <div>
+    <label class="block text-sm font-medium text-gray-700">TikTok точка</label>
+    <select name="branch_id" class="border p-2 rounded">
+      <option value="">Все точки</option>
+      {% for branch in branches %}
+      <option value="{{ branch.id }}" {% if branch_id == branch.id %}selected{% endif %}>{{ branch.name | e }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
   <div>
     <label class="block text-sm font-medium text-gray-700">Сортировка</label>
     <select name="sort_by" class="border p-2 rounded">
@@ -51,6 +62,9 @@
       <th class="p-2 border">Телефон</th>
       <th class="p-2 border">Сумма</th>
       <th class="p-2 border">Тип</th>
+      {% if branches and branches|length > 0 %}
+      <th class="p-2 border">Точка</th>
+      {% endif %}
       {% if user.role == 'admin' %}
       <th class="p-2 border">Создатель</th>
       {% endif %}
@@ -81,6 +95,9 @@
           <span class="text-gray-400">-</span>
         {% endif %}
       </td>
+      {% if branches and branches|length > 0 %}
+      <td class="p-2 border">{{ order.branch.name | e if order.branch else "—" }}</td>
+      {% endif %}
       {% if user.role == 'admin' %}
         <td class="p-2 border">{{ order.created_by_user.name | e if order.created_by_user else "-" }}</td>
       {% endif %}

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Optional
 from fastapi import APIRouter, Form, HTTPException, Request, Depends, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -8,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.payouts.models import Payout, RoleType
 from src.tiktok.shifts.models import Shift
+from src.tiktok.branches.models import TikTokBranch
 from src.database import get_async_session
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.tiktok.reports.service import get_half_month_periods, get_weekly_periods, get_monthly_report, get_payouts_for_period, summarize_period
-from src.users.models import User
+from src.users.models import User, UserRole
 from src.payouts.models import Location
 from src.utils.query_params import optional_date
 
@@ -25,6 +27,7 @@ async def monthly_report_page(
     request: Request,
     month: int = Query(None, ge=1, le=12),
     year: int = Query(None),
+    branch_id: Optional[int] = Query(None),  # None = все точки
     period_mode: str = Query("new", regex="^(old|new|custom)$"),  # new - 4 периода, old - 2 периода, custom - произвольный
     custom_start: str = Query(None),
     custom_end: str = Query(None),
@@ -46,6 +49,11 @@ async def monthly_report_page(
         month = target.month
         year = target.year
 
+    # Загружаем список точек для фильтра
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    branches = [{"id": b.id, "name": b.name} for b in branches_result.scalars().all()]
+
     users_q = await session.execute(select(User))
     users = users_q.scalars().all()
 
@@ -60,7 +68,7 @@ async def monthly_report_page(
         elif custom_start_date > custom_end_date:
             raise HTTPException(status_code=400, detail="Дата начала не может быть позже даты окончания")
         else:
-            data_custom = await get_monthly_report(session, custom_start_date, custom_end_date, current_user=user)
+            data_custom = await get_monthly_report(session, custom_start_date, custom_end_date, current_user=user, branch_id=branch_id)
             payouts_custom = await get_payouts_for_period(session, custom_start_date, custom_end_date, current_user=user)
             custom_summary = summarize_period(data_custom, payouts_custom)
 
@@ -78,14 +86,16 @@ async def monthly_report_page(
                 "periods": periods,
                 "custom_start": custom_start_date,
                 "custom_end": custom_end_date,
+                "branches": branches,
+                "selected_branch_id": branch_id,
             })
 
     if period_mode == "old":
         # Старая логика: 1-15, 16-конец
         first_half, second_half = get_half_month_periods(month, year)
 
-        data_1_15 = await get_monthly_report(session, first_half[0], first_half[1], current_user=user)
-        data_16_31 = await get_monthly_report(session, second_half[0], second_half[1], current_user=user)
+        data_1_15 = await get_monthly_report(session, first_half[0], first_half[1], current_user=user, branch_id=branch_id)
+        data_16_31 = await get_monthly_report(session, second_half[0], second_half[1], current_user=user, branch_id=branch_id)
 
         payouts_1_15 = await get_payouts_for_period(session, first_half[0], first_half[1], current_user=user)
         payouts_16_31 = await get_payouts_for_period(session, second_half[0], second_half[1], current_user=user)
@@ -101,10 +111,10 @@ async def monthly_report_page(
         # Новая логика: 1-7, 8-14, 15-21, 22-конец
         period1, period2, period3, period4 = get_weekly_periods(month, year)
 
-        data_1_7 = await get_monthly_report(session, period1[0], period1[1], current_user=user)
-        data_8_14 = await get_monthly_report(session, period2[0], period2[1], current_user=user)
-        data_15_21 = await get_monthly_report(session, period3[0], period3[1], current_user=user)
-        data_22_end = await get_monthly_report(session, period4[0], period4[1], current_user=user)
+        data_1_7 = await get_monthly_report(session, period1[0], period1[1], current_user=user, branch_id=branch_id)
+        data_8_14 = await get_monthly_report(session, period2[0], period2[1], current_user=user, branch_id=branch_id)
+        data_15_21 = await get_monthly_report(session, period3[0], period3[1], current_user=user, branch_id=branch_id)
+        data_22_end = await get_monthly_report(session, period4[0], period4[1], current_user=user, branch_id=branch_id)
 
         payouts_1_7 = await get_payouts_for_period(session, period1[0], period1[1], current_user=user)
         payouts_8_14 = await get_payouts_for_period(session, period2[0], period2[1], current_user=user)
@@ -131,6 +141,8 @@ async def monthly_report_page(
         "month": month,
         "period_mode": period_mode,
         "periods": periods,
+        "branches": branches,
+        "selected_branch_id": branch_id,
     })
 
 @router.post("/pay")

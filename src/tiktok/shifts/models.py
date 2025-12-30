@@ -5,6 +5,9 @@ from src.users.models import UserRole
 import enum
 from datetime import datetime, time
 
+# Импорт для регистрации модели TikTokBranch в SQLAlchemy до использования ForeignKey
+from src.tiktok.branches.models import TikTokBranch  # noqa: F401
+
 
 class ShiftLocation(str, enum.Enum):
     tiktok = "TikTok"

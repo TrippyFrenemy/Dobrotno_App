@@ -13,6 +13,17 @@
     <label class="block text-sm font-medium text-gray-700">Год</label>
     <input type="number" name="year" value="{{ year or '' }}" class="border p-2 rounded w-28">
   </div>
+  {% if branches and branches|length > 0 %}
+  <div>
+    <label class="block text-sm font-medium text-gray-700">TikTok точка</label>
+    <select name="branch_id" class="border p-2 rounded">
+      <option value="">Все точки</option>
+      {% for branch in branches %}
+      <option value="{{ branch.id }}" {% if branch_id == branch.id %}selected{% endif %}>{{ branch.name | e }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
   <div>
     <label class="block text-sm font-medium text-gray-700">Сортировка</label>
     <select name="sort_by" class="border p-2 rounded">
@@ -29,6 +40,9 @@
     <tr>
       <th class="p-2 border">Дата</th>
       <th class="p-2 border">Локация</th>
+      {% if branches and branches|length > 0 %}
+      <th class="p-2 border">Точка</th>
+      {% endif %}
       <th class="p-2 border">Сотрудники</th>
       <th class="p-2 border">Создал</th>
       <th class="p-2 border">Действия</th>
@@ -39,6 +53,9 @@
     <tr>
       <td class="p-2 border">{{ shift.date | e  }}</td>
       <td class="p-2 border">{{ shift.location.value | e }}</td>
+      {% if branches and branches|length > 0 %}
+      <td class="p-2 border">{{ shift.branch.name | e if shift.branch else "—" }}</td>
+      {% endif %}
       <td class="p-2 border">
         <ul class="list-disc list-inside">
         {% for a in shift.assignments %}

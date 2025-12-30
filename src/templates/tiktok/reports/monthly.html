@@ -4,8 +4,8 @@
 {% block content %}
 <h2 class="text-2xl font-semibold mb-4">📊 Месячный отчёт за {{ month | e }}/{{ year | e }}</h2>
 
-<!-- Форма выбора месяца -->
-<form method="get" class="mb-6 flex gap-4 items-end">
+<!-- Форма выбора месяца и точки -->
+<form method="get" class="mb-6 flex gap-4 items-end flex-wrap">
   <div>
     <label class="block text-sm">Месяц</label>
     <input type="number" name="month" value="{{ month }}" min="1" max="12" class="border p-2 rounded w-24">
@@ -14,17 +14,30 @@
     <label class="block text-sm">Год</label>
     <input type="number" name="year" value="{{ year }}" class="border p-2 rounded w-32">
   </div>
+  {% if branches and branches|length > 0 %}
+  <div>
+    <label class="block text-sm">TikTok точка</label>
+    <select name="branch_id" class="border p-2 rounded">
+      <option value="">Все точки</option>
+      {% for branch in branches %}
+      <option value="{{ branch.id }}" {% if branch.id == selected_branch_id %}selected{% endif %}>
+        {{ branch.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
   <input type="hidden" name="period_mode" value="{{ period_mode }}">
   <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Показать</button>
 </form>
 
 <!-- Переключатель режима периодов -->
 <div class="mb-6 flex gap-3 flex-wrap">
-  <a href="?month={{ month }}&year={{ year }}&period_mode=new"
+  <a href="?month={{ month }}&year={{ year }}&period_mode=new{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}"
      class="px-4 py-2 rounded {% if period_mode == 'new' %}bg-green-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
     🆕 Новая логика (1-7, 8-14, 15-21, 22-конец)
   </a>
-  <a href="?month={{ month }}&year={{ year }}&period_mode=old"
+  <a href="?month={{ month }}&year={{ year }}&period_mode=old{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}"
      class="px-4 py-2 rounded {% if period_mode == 'old' %}bg-green-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
     📅 Старая логика (1-15, 16-конец)
   </a>
@@ -36,7 +49,7 @@
 
 <!-- Форма произвольного периода -->
 <div id="customPeriodForm" class="mb-6 p-4 border rounded bg-gray-50 {% if period_mode != 'custom' %}hidden{% endif %}">
-  <form method="get" class="flex gap-4 items-end">
+  <form method="get" class="flex gap-4 items-end flex-wrap">
     <div>
       <label class="block text-sm font-medium">Дата начала</label>
       <input type="date" name="custom_start" value="{{ custom_start or '' }}" required class="border p-2 rounded">
@@ -45,6 +58,19 @@
       <label class="block text-sm font-medium">Дата окончания</label>
       <input type="date" name="custom_end" value="{{ custom_end or '' }}" required class="border p-2 rounded">
     </div>
+    {% if branches and branches|length > 0 %}
+    <div>
+      <label class="block text-sm font-medium">TikTok точка</label>
+      <select name="branch_id" class="border p-2 rounded">
+        <option value="">Все точки</option>
+        {% for branch in branches %}
+        <option value="{{ branch.id }}" {% if branch.id == selected_branch_id %}selected{% endif %}>
+          {{ branch.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
     <input type="hidden" name="period_mode" value="custom">
     <button class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Показать период</button>
   </form>

@@ -151,16 +151,22 @@ async def shift_list_page(
     month: Optional[int] = Query(datetime.today().month),
     year: Optional[int] = Query(datetime.today().year),
     sort_by: str = Query(default="desc"),
+    branch_id: Optional[int] = Query(None),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(get_manager_or_admin),
 ):
     filters = [extract("month", Shift.date) == month, extract("year", Shift.date) == year]
 
+    # Фильтр по точке
+    if branch_id is not None:
+        filters.append(Shift.branch_id == branch_id)
+
     stmt = (select(Shift)
     .where(and_(*filters))
     .options(
         joinedload(Shift.assignments).joinedload(ShiftAssignment.user),
-        joinedload(Shift.created_by_user)
+        joinedload(Shift.created_by_user),
+        joinedload(Shift.branch)
     ))
 
     if sort_by == "desc":
@@ -171,11 +177,18 @@ async def shift_list_page(
     result = await session.execute(stmt)
     shifts = result.scalars().unique().all()
 
+    # Загружаем все активные точки для фильтра
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    branches = branches_result.scalars().all()
+
     return templates.TemplateResponse("tiktok/shifts/list.html", {
         "request": request,
         "month": month,
         "year": year,
         "sort_by": sort_by,
+        "branch_id": branch_id,
+        "branches": branches,
         "user": user,
         "shifts": shifts
     })
@@ -191,7 +204,8 @@ async def edit_shift_page(
     csrf_token = await generate_csrf_token(user.id)
 
     shift = await session.get(Shift, shift_id, options=[
-        joinedload(Shift.assignments).joinedload(ShiftAssignment.user)
+        joinedload(Shift.assignments).joinedload(ShiftAssignment.user),
+        joinedload(Shift.branch)
     ])
     if not shift:
         raise HTTPException(status_code=404, detail="Смена не найдена")
@@ -203,6 +217,11 @@ async def edit_shift_page(
 
     assigned_ids = [a.user_id for a in shift.assignments]
 
+    # Загружаем активные точки
+    branches_stmt = select(TikTokBranch).where(TikTokBranch.is_active == True).order_by(TikTokBranch.name)
+    branches_result = await session.execute(branches_stmt)
+    branches = branches_result.scalars().all()
+
     return templates.TemplateResponse("tiktok/shifts/edit.html", {
         "request": request,
         "shift": shift,
@@ -211,6 +230,8 @@ async def edit_shift_page(
         "locations": list(ShiftLocation),
         "csrf_token": csrf_token,
         "return_url": return_url,
+        "branches": branches,
+        "user": user
     })
 
 
@@ -221,6 +242,7 @@ async def update_shift(
     date_: date = Form(...),
     location: ShiftLocation = Form(...),
     employees: List[int] = Form(...),
+    branch_id: Optional[int] = Form(None),
     csrf_token: str = Form(...),
     return_url: str | None = Form(None),
     session: AsyncSession = Depends(get_async_session),
@@ -238,6 +260,7 @@ async def update_shift(
 
     shift.date = date_
     shift.location = location
+    shift.branch_id = branch_id
 
     form = await request.form()
 
