@@ -8,11 +8,11 @@ from decimal import Decimal
 
 from src.auth.dependencies import get_admin_user, get_manager_or_admin
 from src.database import get_async_session
-from src.users.models import User
+from src.users.models import User, UserRole
 from src.utils.csrf import generate_csrf_token, verify_csrf_token
 from src.utils.query_params import optional_date
 from src.tiktok.orders.models import Order
-from src.tiktok.order_types.models import OrderType
+from src.tiktok.order_types.models import OrderType, UserOrderTypeSetting
 from src.tiktok.order_types.schemas import OrderTypeCreate, OrderTypeUpdate
 
 router = APIRouter(prefix="/order-types", tags=["Order Types"])
@@ -28,7 +28,10 @@ async def list_order_types(
     """Список всех типов заказов"""
     csrf_token = await generate_csrf_token(current_user.id)
 
-    stmt = select(OrderType).order_by(OrderType.name)
+    if current_user.role == UserRole.ADMIN:
+        stmt = select(OrderType).order_by(OrderType.name)
+    else:
+        stmt = select(OrderType).where(OrderType.is_active == True).order_by(OrderType.name)
     result = await session.execute(stmt)
     order_types = result.scalars().all()
 
@@ -323,3 +326,139 @@ async def delete_order_type(
     await session.commit()
 
     return RedirectResponse("/order-types/", status_code=302)
+
+
+@router.get("/{order_type_id}/settings", response_class=HTMLResponse, dependencies=[Depends(get_admin_user)])
+async def order_type_settings_form(
+    order_type_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_admin_user),
+):
+    """Страница настроек типа заказа (процент по умолчанию и индивидуальные настройки)"""
+    csrf_token = await generate_csrf_token(current_user.id)
+
+    # Получаем тип заказа
+    stmt = select(OrderType).where(OrderType.id == order_type_id)
+    result = await session.execute(stmt)
+    order_type = result.scalar_one_or_none()
+
+    if not order_type:
+        raise HTTPException(status_code=404, detail="Тип заказа не найден")
+
+    # Получаем всех менеджеров и админов
+    users_stmt = select(User).where(
+        User.role.in_([UserRole.MANAGER, UserRole.ADMIN]),
+        User.is_active == True
+    ).order_by(User.name)
+    users_result = await session.execute(users_stmt)
+    managers = users_result.scalars().all()
+
+    # Получаем текущие настройки для этого типа заказа
+    settings_stmt = select(UserOrderTypeSetting).where(
+        UserOrderTypeSetting.order_type_id == order_type_id
+    )
+    settings_result = await session.execute(settings_stmt)
+    settings_map = {s.user_id: s for s in settings_result.scalars().all()}
+
+    # Подготавливаем данные для отображения
+    user_settings = []
+    for manager in managers:
+        setting = settings_map.get(manager.id)
+        user_settings.append({
+            "user_id": manager.id,
+            "user_name": manager.name,
+            "default_percent": float(manager.default_percent),
+            "custom_percent": float(setting.custom_percent) if setting and setting.custom_percent else None,
+            "is_allowed": setting.is_allowed if setting else True,
+        })
+
+    return templates.TemplateResponse(
+        "tiktok/order_types/settings.html",
+        {
+            "request": request,
+            "current_user": current_user,
+            "order_type": order_type,
+            "user_settings": user_settings,
+            "csrf_token": csrf_token,
+        },
+    )
+
+
+@router.post("/{order_type_id}/settings", dependencies=[Depends(get_admin_user)])
+async def update_order_type_settings(
+    order_type_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(get_admin_user),
+):
+    """Обновление настроек типа заказа"""
+    form_data = await request.form()
+
+    # CSRF проверка
+    csrf_token = form_data.get("csrf_token")
+    if not csrf_token or not await verify_csrf_token(user.id, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
+    # Получаем тип заказа
+    stmt = select(OrderType).where(OrderType.id == order_type_id)
+    result = await session.execute(stmt)
+    order_type = result.scalar_one_or_none()
+
+    if not order_type:
+        raise HTTPException(status_code=404, detail="Тип заказа не найден")
+
+    # Обновляем default_employee_percent
+    default_employee_percent_str = form_data.get("default_employee_percent", "").strip()
+    if default_employee_percent_str:
+        order_type.default_employee_percent = Decimal(default_employee_percent_str)
+    else:
+        order_type.default_employee_percent = None
+
+    # Обновляем include_in_employee_salary
+    order_type.include_in_employee_salary = form_data.get("include_in_employee_salary") == "on"
+
+    # Обновляем индивидуальные настройки для каждого пользователя
+    # Формат: user_{user_id}_percent, user_{user_id}_allowed
+    processed_user_ids = set()
+    for key in form_data.keys():
+        if key.startswith("user_") and key.endswith("_percent"):
+            user_id = int(key.replace("user_", "").replace("_percent", ""))
+            processed_user_ids.add(user_id)
+
+            custom_percent_str = form_data.get(f"user_{user_id}_percent", "").strip()
+            is_allowed = form_data.get(f"user_{user_id}_allowed") == "on"
+
+            # Получаем или создаём настройку
+            setting_stmt = select(UserOrderTypeSetting).where(
+                UserOrderTypeSetting.user_id == user_id,
+                UserOrderTypeSetting.order_type_id == order_type_id
+            )
+            setting_result = await session.execute(setting_stmt)
+            setting = setting_result.scalar_one_or_none()
+
+            # Определяем нужно ли создавать/обновлять/удалять настройку
+            custom_percent = Decimal(custom_percent_str) if custom_percent_str else None
+            has_custom_settings = custom_percent is not None or not is_allowed
+
+            if has_custom_settings:
+                if setting:
+                    # Обновляем существующую
+                    setting.custom_percent = custom_percent
+                    setting.is_allowed = is_allowed
+                else:
+                    # Создаём новую
+                    new_setting = UserOrderTypeSetting(
+                        user_id=user_id,
+                        order_type_id=order_type_id,
+                        custom_percent=custom_percent,
+                        is_allowed=is_allowed
+                    )
+                    session.add(new_setting)
+            elif setting:
+                # Удаляем настройку если вернулись к дефолтам
+                await session.delete(setting)
+
+    await session.commit()
+
+    return RedirectResponse(f"/order-types/{order_type_id}/settings?success=1", status_code=302)

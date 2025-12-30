@@ -214,7 +214,7 @@ async def _send_weekly_performance_summary():
                     func.sum(Order.amount).label("total_amount"),
                 )
                 .where(
-                    Order.creator_id == manager.id,
+                    Order.created_by == manager.id,
                     Order.date >= start_date,
                     Order.date <= end_date
                 )

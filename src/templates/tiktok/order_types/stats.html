@@ -32,7 +32,7 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Год</label>
           <select name="year" class="border p-2 rounded">
-            {% for y in range(2023, now().year + 1) %}
+            {% for y in range(2023, year + 1) %}
               <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
             {% endfor %}
           </select>
